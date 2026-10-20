@@ -1,7 +1,8 @@
-import { AudioLines, FileText, Keyboard, LoaderCircle, Mic, MicOff, ScanText } from 'lucide-react';
+import { FileText, Keyboard, Mic, MicOff, ScanText } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useSignal, useStore } from '../lib/store';
+import { useStore } from '../lib/store';
 import { engine, type SessionState } from '../live/engine';
+import { Orb } from './Orb';
 
 const CAPTION: Record<SessionState, { title: string; tone: string }> = {
   idle: { title: 'Tercümanı başlatmak için dokunun', tone: 'bg-label-3' },
@@ -12,60 +13,6 @@ const CAPTION: Record<SessionState, { title: string; tone: string }> = {
   translating: { title: 'Çevriliyor…', tone: 'bg-accent' },
   speaking: { title: 'Seslendiriliyor · Geçmek için dokunun', tone: 'bg-accent' },
 };
-
-function Orb() {
-  const session = useStore(engine.store, (s) => s.session);
-  const muted = useStore(engine.store, (s) => s.muted);
-  const mic = useSignal(engine.micLevel);
-  const out = useSignal(engine.outLevel);
-  const active = session !== 'idle';
-  const busy = session === 'connecting' || session === 'reconnecting';
-  const speaking = session === 'speaking';
-  const level = speaking ? out : muted ? 0 : mic;
-  const live = active && !busy && !(muted && !speaking);
-
-  const label = !active ? 'Tercümanı başlat' : speaking ? 'Seslendirmeyi geç' : 'Tercümanı durdur';
-  const onClick = () => (speaking ? engine.skipSpeech() : void engine.toggle());
-
-  return (
-    <div className="relative flex items-center justify-center w-[76px] h-[76px]">
-      {live && (
-        <>
-          <span
-            aria-hidden="true"
-            className="absolute -inset-2 transition-[transform,opacity] duration-100 ease-out"
-            style={{ transform: `scale(${0.92 + level * 0.32})`, opacity: 0.35 + level * 0.6 }}
-          >
-            <span className="ai-glow inset-0" />
-          </span>
-          <span aria-hidden="true" className="ai-ring -inset-[3px]" />
-        </>
-      )}
-      {!active && !muted && <span aria-hidden="true" className="absolute -inset-2 rounded-full bg-accent/25 anim-breathe" />}
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={label}
-        title={label}
-        className={`relative z-10 w-[72px] h-[72px] rounded-full flex items-center justify-center cursor-pointer transition-[transform,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.93] ${
-          active ? 'bg-surface shadow-[0_0_0_0.5px_var(--separator),0_10px_28px_-10px_rgb(0_0_0/0.35)]' : muted ? 'bg-sys-gray text-white' : 'mic-hero text-white'
-        }`}
-      >
-        {busy ? (
-          <LoaderCircle className="w-7 h-7 animate-spin text-sys-orange" strokeWidth={2.25} />
-        ) : speaking ? (
-          <AudioLines className="w-7 h-7 text-accent" strokeWidth={2.25} />
-        ) : active ? (
-          <span className="block w-[26px] h-[26px] rounded-[7px] bg-sys-red" />
-        ) : muted ? (
-          <MicOff className="w-8 h-8" strokeWidth={2} />
-        ) : (
-          <Mic className="w-8 h-8" strokeWidth={2} />
-        )}
-      </button>
-    </div>
-  );
-}
 
 function DockButton({
   icon,

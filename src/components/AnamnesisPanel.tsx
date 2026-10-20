@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Check,
   Cigarette,
+  ChevronRight,
   ClipboardList,
   Copy,
   HandHeart,
@@ -14,11 +15,14 @@ import {
   TriangleAlert,
   Users,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CATEGORY_TITLES, factText, formatAnamnesisReport, groupFacts } from '../../shared/medical/anamnesis';
+import { type TermQuery, termOf } from '../../shared/medical/terms';
 import type { Fact, FactCategory } from '../../shared/types';
 import { useStore } from '../lib/store';
+import { prefetchTerms } from '../lib/terms';
 import { engine } from '../live/engine';
+import { TermSheet } from './TermSheet';
 import { copyText } from './ui';
 
 const STYLE: Record<FactCategory, { icon: LucideIcon; glyph: string; wide?: boolean }> = {
@@ -60,15 +64,27 @@ function SyncStatus() {
   return <span>Konuşma sırasında otomatik çıkarılır</span>;
 }
 
-function FactRow({ fact, critical, first }: { fact: Fact; critical: boolean; first: boolean }) {
+function FactRow({
+  fact,
+  critical,
+  first,
+  onExplain,
+}: {
+  fact: Fact;
+  critical: boolean;
+  first: boolean;
+  onExplain?: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const tappable = !!onExplain || !!fact.evidence;
   return (
-    <li className={`pr-4 ${first ? '' : 'hairline-t'}`}>
+    <li className={first ? '' : 'hairline-t-inset'}>
       <button
         type="button"
-        onClick={() => fact.evidence && setOpen((o) => !o)}
-        aria-expanded={fact.evidence ? open : undefined}
-        className={`w-full text-left py-2.5 flex items-start gap-2 ${fact.evidence ? 'cursor-pointer' : 'cursor-default'}`}
+        onClick={() => (onExplain ? onExplain() : fact.evidence && setOpen((o) => !o))}
+        aria-expanded={!onExplain && fact.evidence ? open : undefined}
+        aria-haspopup={onExplain ? 'dialog' : undefined}
+        className={`row-press w-full text-left pl-4 pr-3 py-[11px] flex items-center gap-2 ${tappable ? 'cursor-pointer' : 'cursor-default'}`}
       >
         <span
           className={`flex-1 text-[15px] leading-snug tracking-[-0.012em] ${
@@ -77,10 +93,11 @@ function FactRow({ fact, critical, first }: { fact: Fact; critical: boolean; fir
         >
           {factText(fact)}
         </span>
-        {fact.origin === 'ai' && <BadgeCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={2} aria-label="Yapay zekâ doğruladı" />}
+        {fact.origin === 'ai' && <BadgeCheck className="w-[17px] h-[17px] text-accent shrink-0" strokeWidth={2} aria-label="Yapay zekâ doğruladı" />}
+        {onExplain && <ChevronRight className="w-4 h-4 text-label-3 shrink-0 -mr-0.5" strokeWidth={2.5} aria-hidden="true" />}
       </button>
       {open && fact.evidence && (
-        <p dir="auto" className="-mt-1 pb-2.5 text-[13px] italic text-label-2 leading-snug anim-fade">
+        <p dir="auto" className="-mt-1 pl-4 pr-4 pb-2.5 text-[13px] italic text-label-2 leading-snug anim-fade">
           “{fact.evidence}”
         </p>
       )}
@@ -92,8 +109,16 @@ export function AnamnesisPanel() {
   const facts = useStore(engine.store, (s) => s.facts);
   const language = useStore(engine.store, (s) => s.language);
   const [copied, setCopied] = useState(false);
+  const [explain, setExplain] = useState<{ fact: Fact; query: TermQuery } | null>(null);
+  const closeExplain = useCallback(() => setExplain(null), []);
   const groups = groupFacts(facts);
   const total = facts.length;
+
+  // Positive medical terms get a card; warm the cache so a tap opens instantly
+  const terms = useMemo(() => new Map(facts.filter((f) => !f.negated).map((f) => [f.key, termOf(f)] as const)), [facts]);
+  useEffect(() => {
+    prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => !!q));
+  }, [terms]);
 
   const copy = async () => {
     if (await copyText(formatAnamnesisReport(facts, language.nameTr))) {
@@ -103,75 +128,92 @@ export function AnamnesisPanel() {
   };
 
   return (
-    <div className="@container h-full overflow-y-auto overscroll-contain px-3 sm:px-5 py-4">
-      <div className="flex items-center justify-between gap-3 px-1 mb-3">
-        <div className="min-w-0">
-          <h3 className="text-[15px] font-semibold tracking-[-0.016em] truncate">
-            Anlık Klinik Anamnez <span className="font-normal text-label-2 tabular">{total} bilgi</span>
-          </h3>
-          <p className="text-[12px] text-label-2 truncate">
-            <SyncStatus />
-          </p>
-        </div>
-        {total > 0 && (
-          <button
-            type="button"
-            onClick={copy}
-            className={`pressable h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-[13px] font-medium cursor-pointer shrink-0 ${
-              copied ? 'bg-sys-green/15 text-sys-green' : 'btn-tinted'
-            }`}
-            title="HBYS'ye yapıştırmak için kopyala"
-          >
-            {copied ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} /> : <Copy className="w-3.5 h-3.5" strokeWidth={2} />}
-            {copied ? 'Kopyalandı' : 'Kopyala'}
-          </button>
-        )}
-      </div>
-
+    <div className="@container h-full overflow-y-auto overscroll-contain px-3 sm:px-5 pt-3 pb-4">
       {total === 0 ? (
-        <div className="flex flex-col items-center justify-center px-8 py-14 text-center anim-fade">
-          <div className="w-16 h-16 rounded-[20px] bg-sys-indigo/12 text-sys-indigo flex items-center justify-center mb-4">
-            <ClipboardList className="w-7 h-7" strokeWidth={2} />
+        <div className="h-full min-h-[320px] flex flex-col items-center justify-center px-8 py-10 text-center anim-fade">
+          <div className="empty-icon w-[72px] h-[72px] rounded-[22px] flex items-center justify-center mb-5 text-white">
+            <ClipboardList className="w-8 h-8" strokeWidth={1.9} />
           </div>
-          <p className="text-[20px] font-semibold tracking-[-0.022em]">Anamnez Bekleniyor</p>
-          <p className="mt-1.5 text-[15px] text-label-2 max-w-[320px] leading-relaxed balance">
-            Şikayetler, ilaçlar, alerjiler, kronik hastalıklar, ameliyatlar ve istekler konuşmada geçtikçe burada listelenir.
+          <p className="text-[22px] font-semibold tracking-[-0.026em]">Anamnez Bekleniyor</p>
+          <p className="mt-2 text-[15px] text-label-2 max-w-[330px] leading-relaxed balance">
+            Şikâyetler, ilaçlar, alerjiler ve kronik hastalıklar konuşmada geçtikçe burada belirir. Tıbbi terimlere dokunarak kısa bilgi kartını açabilirsiniz.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 @lg:grid-cols-2 gap-3 pb-2">
-          {groups.map(({ category, facts: list }) => {
-            const style = STYLE[category];
-            const Icon = style.icon;
-            const critical = category === 'allergy' && list.some((f) => !f.negated);
-            return (
-              <section
-                key={category}
-                className={`anim-rise rounded-[18px] overflow-hidden ${style.wide ? '@lg:col-span-2' : ''} ${
-                  critical ? 'bg-sys-red/8 ring-1 ring-sys-red/30' : 'bg-surface shadow-card'
-                }`}
-              >
-                <header className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
-                  <span className={`glyph w-[26px] h-[26px] rounded-[7px] ${style.glyph}`}>
-                    <Icon className="w-[15px] h-[15px]" strokeWidth={2.25} />
-                  </span>
-                  <h4 className={`text-[15px] font-semibold tracking-[-0.016em] ${critical ? 'text-sys-red' : ''}`}>{CATEGORY_TITLES[category]}</h4>
-                  <span className="ml-auto text-[13px] text-label-2 tabular">{list.filter((f) => !f.negated).length || ''}</span>
-                </header>
-                <ul className="pl-4 pb-1">
-                  {list.map((f, i) => (
-                    <FactRow key={f.key} fact={f} critical={critical && !f.negated} first={i === 0} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </div>
+        <>
+          <div className="flex items-center justify-between gap-3 px-1 pb-3">
+            <p className="min-w-0 text-[13px] text-label-2 truncate">
+              <SyncStatus />
+            </p>
+            <button
+              type="button"
+              onClick={copy}
+              className={`pressable h-8 px-3.5 rounded-full inline-flex items-center gap-1.5 text-[13px] font-semibold cursor-pointer shrink-0 ${
+                copied ? 'bg-sys-green/15 text-sys-green' : 'btn-tinted'
+              }`}
+              title="HBYS'ye yapıştırmak için kopyala"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" strokeWidth={2.75} /> : <Copy className="w-3.5 h-3.5" strokeWidth={2.25} />}
+              {copied ? 'Kopyalandı' : 'Kopyala'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 @lg:grid-cols-2 gap-3 pb-2 items-start">
+            {groups.map(({ category, facts: list }) => {
+              const style = STYLE[category];
+              const Icon = style.icon;
+              const critical = category === 'allergy' && list.some((f) => !f.negated);
+              const count = list.filter((f) => !f.negated).length;
+              return (
+                <section
+                  key={category}
+                  className={`anim-rise rounded-[20px] overflow-hidden ${style.wide ? '@lg:col-span-2' : ''} ${
+                    critical ? 'card-critical' : 'bg-surface shadow-card'
+                  }`}
+                >
+                  <header className="flex items-center gap-2.5 px-4 pt-3.5 pb-1">
+                    <span className={`glyph w-[26px] h-[26px] rounded-[7.5px] ${style.glyph}`}>
+                      <Icon className="w-[15px] h-[15px]" strokeWidth={2.25} />
+                    </span>
+                    <h4 className={`text-[15px] font-semibold tracking-[-0.016em] ${critical ? 'text-sys-red' : ''}`}>{CATEGORY_TITLES[category]}</h4>
+                    {count > 0 && (
+                      <span className={`ml-auto min-w-[22px] h-[22px] px-1.5 rounded-full text-[12px] font-semibold tabular inline-flex items-center justify-center ${critical ? 'bg-sys-red text-white' : 'bg-fill text-label-2'}`}>
+                        {count}
+                      </span>
+                    )}
+                  </header>
+                  <ul className="pb-1">
+                    {list.map((f, i) => {
+                      const query = terms.get(f.key);
+                      return (
+                        <FactRow
+                          key={f.key}
+                          fact={f}
+                          critical={critical && !f.negated}
+                          first={i === 0}
+                          onExplain={query ? () => setExplain({ fact: f, query }) : undefined}
+                        />
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+          <p className="px-2 pt-2 pb-4 text-[12px] text-label-3 leading-snug">
+            Tıbbi terime dokunarak kısa bilgi kartını açabilirsiniz. Otomatik çıkarımdır; klinik doğrulama gerektirir.
+          </p>
+        </>
       )}
-      {total > 0 && (
-        <p className="px-2 pt-2 pb-4 text-[12px] text-label-3 leading-snug">
-          Satıra dokunarak dayandığı konuşmayı görebilirsiniz. Otomatik çıkarımdır; klinik doğrulama gerektirir.
-        </p>
+
+      {explain && (
+        <TermSheet
+          query={explain.query}
+          fact={explain.fact}
+          glyph={STYLE[explain.fact.category].glyph}
+          icon={STYLE[explain.fact.category].icon}
+          onClose={closeExplain}
+        />
       )}
     </div>
   );

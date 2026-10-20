@@ -3,15 +3,22 @@ import { type Express, json, Router } from 'express';
 import { getLanguage } from '../shared/languages';
 import { combineLayers, mergeFacts } from '../shared/medical/anamnesis';
 import { canonicalKey, DialogueState, extractFacts } from '../shared/medical/extract';
+import { type TermInfo, type TermKind, termKey } from '../shared/medical/terms';
 import { fuseSpeaker } from '../shared/speaker';
 import { fold, words } from '../shared/text';
 import type { AnamnesisRequest, ConversationSummary, Fact, FactCategory, Speaker } from '../shared/types';
 import { VOICES } from '../shared/types';
 import { generateJson, synthesize } from './ai';
 import { config } from './config';
-import { mockSpeech, mockTranslate } from './mock';
-import { anamnesisInstruction, summaryInstruction, translateInstruction } from './prompts';
+import { mockSpeech, mockTerm, mockTranslate } from './mock';
+import { anamnesisInstruction, summaryInstruction, termInstruction, translateInstruction } from './prompts';
 import { cleanString, hasAccess, rateLimit, requireAccess } from './security';
+
+const TERM_KINDS: TermKind[] = ['drug', 'condition', 'symptom', 'procedure', 'allergen'];
+
+/** Term cards are the same for every patient: answer repeats from memory. */
+const termCache = new Map<string, TermInfo>();
+const TERM_CACHE_MAX = 800;
 
 const CATEGORIES: FactCategory[] = ['complaint', 'need', 'medication', 'allergy', 'chronic', 'surgery', 'habit', 'family', 'instruction'];
 
@@ -256,6 +263,65 @@ export function mountRoutes(app: Express): void {
       targetLanguage: lang,
       timestamp: Date.now(),
     } satisfies ConversationSummary);
+  });
+
+  // Short reference card for a term the nurse tapped in the anamnesis
+  api.post('/term', rateLimit('term', 60), async (req, res) => {
+    const term = cleanString(req.body?.term, 80);
+    const kind = TERM_KINDS.includes(req.body?.kind) ? (req.body.kind as TermKind) : 'condition';
+    if (!term) {
+      res.status(400).json({ error: 'term_required' });
+      return;
+    }
+    const cacheKey = termKey({ term, kind });
+    const cached = termCache.get(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    if (config.mock) {
+      res.json(mockTerm(term, kind));
+      return;
+    }
+    const out = await generateJson<Partial<TermInfo>>({
+      models: [config.models.fast, config.models.smart],
+      system: termInstruction,
+      input: { term, kind },
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          known: { type: Type.BOOLEAN },
+          summary: { type: Type.STRING },
+          activeIngredient: { type: Type.STRING },
+          drugClass: { type: Type.STRING },
+          points: { type: Type.ARRAY, items: { type: Type.STRING } },
+          nursing: { type: Type.ARRAY, items: { type: Type.STRING } },
+        },
+        required: ['known', 'summary'],
+      },
+      timeoutMs: 8000,
+      temperature: 0.1,
+    });
+    if (!out) {
+      res.status(502).json({ error: 'term_failed' });
+      return;
+    }
+    const list = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => cleanString(x, 140)).filter(Boolean).slice(0, n) : []);
+    const info: TermInfo = {
+      term,
+      kind,
+      known: out.known !== false && !!cleanString(out.summary, 400),
+      summary: cleanString(out.summary, 400),
+      activeIngredient: kind === 'drug' ? cleanString(out.activeIngredient, 120) || undefined : undefined,
+      drugClass: kind === 'drug' ? cleanString(out.drugClass, 80) || undefined : undefined,
+      points: list(out.points, 3),
+      nursing: list(out.nursing, 3),
+    };
+    if (info.known) {
+      if (termCache.size >= TERM_CACHE_MAX) termCache.delete(termCache.keys().next().value as string);
+      termCache.set(cacheKey, info);
+    }
+    res.json(info);
   });
 
   api.post('/tts', rateLimit('tts', 120), async (req, res) => {

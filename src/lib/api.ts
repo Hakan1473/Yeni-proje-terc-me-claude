@@ -1,3 +1,4 @@
+import type { TermInfo, TermQuery } from '../../shared/medical/terms';
 import type { AnamnesisRequest, AnamnesisResponse, ConversationSummary, Speaker, TranslateResponse } from '../../shared/types';
 import { getAccessCode } from './settings';
 
@@ -53,4 +54,8 @@ export function summary(
   turns: { id: string; speaker: Speaker; source: string; translation?: string }[],
 ) {
   return post<ConversationSummary>('summary', { languageName, turns });
+}
+
+export function term(q: TermQuery, signal?: AbortSignal) {
+  return post<TermInfo>('term', q, signal);
 }

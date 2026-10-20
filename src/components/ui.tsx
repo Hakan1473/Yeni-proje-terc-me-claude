@@ -1,5 +1,6 @@
 import { Languages, X } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 // ───────────────────────── Flag ─────────────────────────
 
@@ -108,7 +109,8 @@ export function Sheet({
     };
   }, [onClose]);
 
-  return (
+  // Portalled so a sheet opened from inside a transformed pane still covers the screen
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6" style={overlayStyle} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <button type="button" tabIndex={-1} aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/30 dark:bg-black/60 anim-fade cursor-default" />
       <div
@@ -138,7 +140,8 @@ export function Sheet({
         <div className={`flex-1 min-h-0 overflow-y-auto overscroll-contain ${bodyClass}`}>{children}</div>
         {footer && <div className="hairline-t px-4 sm:px-6 py-3 shrink-0 flex items-center gap-2">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

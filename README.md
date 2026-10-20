@@ -9,6 +9,7 @@ Hemşire ve sağlık personeli için yabancı dildeki hastalarla **gerçek zaman
 - **Gemini Live** ile sesten sese tercüme. Ses ikili (binary) olarak, düşük gecikmeyle iletilir; dil veya ses değişiminde kesinti olmaz, bağlantı koparsa bağlam korunur.
 - **Doğru konuşmacı ayrımı**: Kürtçe, Azerice, Türkmence ve Özbekçe dahil 59 dilde "Türkçe mi, hastanın dili mi?" sınıflandırması.
 - **Anlık anamnez**: şikâyetler, ilaçlar (etken maddesi, dozu ve sıklığıyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar, aile öyküsü, istekler ve talimatlar. Önce yerel çıkarım yapılır, ardından yapay zekâ doğrular. Her bulgunun konuşmadaki dayanağı gösterilir; tek dokunuşla HBYS'ye kopyalanır.
+- **Tıbbi bilgi kartı**: anamnezdeki ilaca, hastalığa veya belirtiye dokunulduğunda kısa bir kart açılır: ne olduğu, etken madde, ilaç grubu ve hemşirenin dikkat etmesi gerekenler. Kartlar arka planda önceden hazırlanır ve cihazda saklanır, bu yüzden anında açılır.
 - **Sayı tutarlılık denetimi**: "500 mg" çeviride "50 mg" olursa uyarır.
 - **Hastaya Göster**: ekranı ikiye bölen, üst yarısı hastaya dönük karşılıklı görünüm.
 - Çağrı butonu ve Triflow **eğitim videoları**, konuşma özeti, geçmiş (yalnızca cihazda), yazarak çeviri, açık/koyu/otomatik görünüm.
@@ -51,7 +52,7 @@ Proje AI Studio şablonuyla uyumludur: `server.ts` giriş dosyası, `metadata.js
 | Komut | İş |
 |---|---|
 | `npm run dev` | Geliştirme sunucusu (Vite + Express + WebSocket) |
-| `npm test` | 102 birim testi (Vitest) |
+| `npm test` | 107 birim testi (Vitest) |
 | `npm run lint` | TypeScript tip denetimi |
 | `npm run build` | Üretim derlemesi |
 

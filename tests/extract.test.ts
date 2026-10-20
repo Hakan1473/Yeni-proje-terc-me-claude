@@ -127,5 +127,8 @@ describe('canonicalKey', () => {
     expect(canonicalKey('medication', 'Parol 500 mg')).toBe('medication:parasetamol');
     expect(canonicalKey('chronic', 'Tip 2 Diyabet')).toBe('chronic:tip 2 diyabet');
     expect(canonicalKey('allergy', 'Penisilin')).toBe('allergy:penisilin');
+    // Turkish letters in the body site, and the duration the display text carries
+    expect(canonicalKey('complaint', 'Göğüs ağrısı (iki gündür)')).toBe(dialogue([['patient', 'Göğüs ağrım var.']])[0].key);
+    expect(canonicalKey('complaint', 'Baş ağrısı')).toBe('complaint:bas agrisi');
   });
 });

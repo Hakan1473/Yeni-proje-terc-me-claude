@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, Mic, MicOff, RotateCw, Send, WifiOff, X } from 'lucide-react';
+import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, MicOff, RotateCw, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { LANGUAGES } from '../../shared/languages';
 import type { Turn } from '../../shared/types';
@@ -7,6 +7,7 @@ import { setAccessCode } from '../lib/settings';
 import { useStore } from '../lib/store';
 import { engine } from '../live/engine';
 import { Flag, Sheet } from './ui';
+import { Orb, OrbArt } from './Orb';
 
 // ───────────────────────── Toast ─────────────────────────
 
@@ -76,7 +77,6 @@ export function Splash({ onDone }: { onDone: () => void }) {
       </div>
       <div className="relative flex flex-col items-center text-center px-8 anim-pop">
         <div className="relative">
-          <span aria-hidden="true" className="ai-glow -inset-3 opacity-60" />
           <img src="/logo.png" alt="" className="relative w-[108px] h-[108px] rounded-[26px] bg-white shadow-[0_20px_50px_-12px_rgb(0_0_0/0.3)]" />
         </div>
         <h1 className="mt-7 text-[30px] font-semibold tracking-[-0.03em]">Canlı Sesli Tercüman</h1>
@@ -137,7 +137,6 @@ export function TypeSheet({ onClose }: { onClose: () => void }) {
 export function FaceToFace({ onClose }: { onClose: () => void }) {
   const items = useStore(engine.store, (s) => s.items);
   const language = useStore(engine.store, (s) => s.language);
-  const session = useStore(engine.store, (s) => s.session);
   const [flipped, setFlipped] = useState(true);
   const last = [...items].reverse().find((i): i is Turn => i.kind === 'turn' && !!(i.source || i.translation));
 
@@ -180,14 +179,7 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
         <button type="button" onClick={onClose} aria-label="Kapat" className="pressable relative w-11 h-11 rounded-full bg-surface shadow-card flex items-center justify-center cursor-pointer">
           <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
         </button>
-        <button
-          type="button"
-          onClick={() => void engine.toggle()}
-          aria-label={session === 'idle' ? 'Tercümanı başlat' : 'Tercümanı durdur'}
-          className={`pressable relative w-14 h-14 rounded-full flex items-center justify-center cursor-pointer ${session === 'idle' ? 'mic-hero text-white' : 'bg-surface shadow-card'}`}
-        >
-          {session === 'idle' ? <Mic className="w-6 h-6" strokeWidth={2} /> : <span className="w-5 h-5 rounded-[6px] bg-sys-red" />}
-        </button>
+        <Orb size={56} />
         <button
           type="button"
           onClick={() => setFlipped((f) => !f)}
@@ -235,12 +227,7 @@ const STEPS: { title: string; body: string; glyph: string; visual: ReactNode }[]
     body: 'Mikrofona dokunduğunuzda canlı hat açılır. Türkçe konuşan personel, diğer dilde konuşan hasta olarak ayrılır; çeviri doğal bir sesle anında okunur.',
     glyph: 'bg-sys-green',
     visual: (
-      <span className="relative flex items-center justify-center w-16 h-16 mx-auto">
-        <span className="absolute -inset-2 rounded-full bg-accent/25 anim-breathe" />
-        <span className="mic-hero relative w-16 h-16 rounded-full text-white flex items-center justify-center">
-          <Mic className="w-7 h-7" strokeWidth={2} />
-        </span>
-      </span>
+      <OrbArt size={72} />
     ),
   },
   {

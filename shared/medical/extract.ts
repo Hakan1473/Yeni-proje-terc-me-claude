@@ -686,7 +686,7 @@ export function canonicalKey(category: FactCategory, text: string): string {
       break;
     case 'complaint': {
       if (/ağrı şiddeti/u.test(lower)) return 'complaint:pain-score';
-      for (const p of PAIN_SITES) if (lower.startsWith(fold(p[0]).slice(0, 3)) && /ağrı/u.test(lower)) return key('complaint', `${p[0]} ağrısı`);
+      for (const p of PAIN_SITES) if (fold(lower).startsWith(`${fold(p[0])} `) && /ağrı/u.test(lower)) return key('complaint', `${p[0]} ağrısı`);
       for (const sy of SYMPTOMS) if (fold(lower).startsWith(fold(sy.label).slice(0, 5))) return key('complaint', sy.label);
       break;
     }
