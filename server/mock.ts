@@ -1,0 +1,68 @@
+import { classifySpeaker } from '../shared/speaker';
+import type { Language, Speaker } from '../shared/types';
+import { pcmToWav } from './ai';
+
+/**
+ * Simulation mode: lets the whole app run end-to-end without an API key
+ * (demos, UI work, automated browser tests). Nothing here is used when a
+ * real GEMINI_API_KEY is configured and MOCK_AI is not set.
+ */
+
+export interface ScriptTurn {
+  speaker: Speaker;
+  said: string;
+  heard: string;
+}
+
+// A short ward conversation that exercises every feature: allergies, medication
+// with dose, complaints with duration, pain score, a deliberate dose mismatch
+// (500 → 50) for the number guard, both tutorial videos, and a patient request.
+export const DEMO_SCRIPT: ScriptTurn[] = [
+  { speaker: 'nurse', said: 'Merhaba, ben hemşireniz Ayşe. Geçmiş olsun. Herhangi bir alerjiniz var mı?', heard: "Hello, I'm your nurse Ayşe. I hope you feel better soon. Do you have any allergies?" },
+  { speaker: 'patient', said: "Yes, I'm allergic to penicillin. I take Beloc 50 mg every morning.", heard: 'Evet, penisiline alerjim var. Her sabah Beloc 50 mg kullanıyorum.' },
+  { speaker: 'nurse', said: 'Anladım. Şikayetiniz nedir?', heard: 'I understand. What is your complaint?' },
+  { speaker: 'patient', said: 'I have had chest pain for two days and I feel dizzy.', heard: 'İki gündür göğüs ağrım var ve başım dönüyor.' },
+  { speaker: 'nurse', said: 'Ağrınızı 1 ile 10 arasında puanlar mısınız?', heard: 'Could you rate your pain from 1 to 10?' },
+  { speaker: 'patient', said: 'About seven.', heard: 'Yaklaşık yedi.' },
+  { speaker: 'nurse', said: 'Şimdi size 500 mg Parol vereceğim ve damar yolu açacağım.', heard: 'I will now give you 50 mg of Parol, which is paracetamol, and insert an IV line.' },
+  { speaker: 'nurse', said: 'Bir şeye ihtiyacınız olursa lütfen yatağınızın yanındaki çağrı butonuna basın.', heard: 'If you need anything, please press the call button next to your bed.' },
+  { speaker: 'patient', said: 'Could I have some water, please?', heard: 'Biraz su alabilir miyim lütfen?' },
+  { speaker: 'nurse', said: 'Ameliyattan sonra Triflow cihazını saatte bir kez, 10 defa derin nefes çekerek kullanacaksınız.', heard: 'After the surgery, you will use the Triflow device once every hour, breathing in deeply 10 times.' },
+];
+
+export function mockTranslate(text: string, lang: Language, hint?: Speaker): { translation: string; speaker: Speaker } {
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const hit = DEMO_SCRIPT.find((t) => norm(t.said) === norm(text) || norm(t.heard) === norm(text));
+  if (hit) {
+    const fromSaid = norm(hit.said) === norm(text);
+    return { translation: fromSaid ? hit.heard : hit.said, speaker: fromSaid ? hit.speaker : hit.speaker === 'nurse' ? 'patient' : 'nurse' };
+  }
+  const speaker = hint ?? classifySpeaker(text, lang.code).speaker;
+  return { translation: speaker === 'nurse' ? `[${lang.native}] ${text}` : `[Türkçe] ${text}`, speaker };
+}
+
+/**
+ * Voice-like test signal: a few harmonics with a syllable-rate envelope.
+ * Quiet on purpose; it only proves the audio path works.
+ */
+export function mockPcm(seconds: number, sampleRate = 24000): Buffer {
+  const n = Math.max(1, Math.floor(seconds * sampleRate));
+  const buf = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate;
+    const pitch = 170 + 25 * Math.sin(2 * Math.PI * 0.7 * t);
+    const syllable = 0.5 + 0.5 * Math.sin(2 * Math.PI * 4.5 * t) ** 2;
+    const fade = Math.min(1, t / 0.05, (seconds - t) / 0.08);
+    const v =
+      (Math.sin(2 * Math.PI * pitch * t) + 0.5 * Math.sin(4 * Math.PI * pitch * t) + 0.25 * Math.sin(6 * Math.PI * pitch * t)) *
+      syllable *
+      Math.max(0, fade) *
+      0.08;
+    buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), i * 2);
+  }
+  return buf;
+}
+
+export function mockSpeech(text: string): string {
+  return pcmToWav(mockPcm(Math.min(4, 0.6 + text.length * 0.045))).toString('base64');
+}

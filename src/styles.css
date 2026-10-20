@@ -1,0 +1,524 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   Design tokens — iOS system palette. Every color in the UI resolves to one
+   of these, so light and dark stay in lockstep.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --surface-3: #e5e5ea;
+  --fill: rgb(120 120 128 / 0.12);
+  --fill-2: rgb(120 120 128 / 0.08);
+  --material: rgb(249 249 251 / 0.78);
+  --separator: rgb(60 60 67 / 0.14);
+
+  --label: #000000;
+  --label-2: rgb(60 60 67 / 0.62);
+  --label-3: rgb(60 60 67 / 0.36);
+
+  --accent: #007aff;
+  --accent-soft: rgb(0 122 255 / 0.1);
+  --accent-ink: #0062cc;
+
+  --patient: #0a7d8c;
+  --patient-soft: rgb(48 176 199 / 0.12);
+
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --teal: #30b0c7;
+  --indigo: #5856d6;
+  --purple: #af52de;
+  --pink: #ff2d55;
+  --gray: #8e8e93;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 12px rgb(0 0 0 / 0.04);
+  --shadow-float: 0 4px 12px rgb(0 0 0 / 0.06), 0 24px 56px rgb(0 0 0 / 0.14);
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --surface-3: #3a3a3c;
+  --fill: rgb(120 120 128 / 0.24);
+  --fill-2: rgb(120 120 128 / 0.16);
+  --material: rgb(28 28 30 / 0.78);
+  --separator: rgb(84 84 88 / 0.62);
+
+  --label: #ffffff;
+  --label-2: rgb(235 235 245 / 0.62);
+  --label-3: rgb(235 235 245 / 0.32);
+
+  --accent: #0a84ff;
+  --accent-soft: rgb(10 132 255 / 0.2);
+  --accent-ink: #64aaff;
+
+  --patient: #5ad0e2;
+  --patient-soft: rgb(64 200 224 / 0.16);
+
+  --green: #30d158;
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --teal: #40c8e0;
+  --indigo: #5e5ce6;
+  --purple: #bf5af2;
+  --pink: #ff375f;
+  --gray: #8e8e93;
+
+  --shadow-card: 0 0 0 0.5px rgb(255 255 255 / 0.07);
+  --shadow-float: 0 0 0 0.5px rgb(255 255 255 / 0.09), 0 24px 64px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --color-separator: var(--separator);
+  --color-label: var(--label);
+  --color-label-2: var(--label-2);
+  --color-label-3: var(--label-3);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-patient: var(--patient);
+  --color-patient-soft: var(--patient-soft);
+  --color-sys-green: var(--green);
+  --color-sys-red: var(--red);
+  --color-sys-orange: var(--orange);
+  --color-sys-yellow: var(--yellow);
+  --color-sys-teal: var(--teal);
+  --color-sys-indigo: var(--indigo);
+  --color-sys-purple: var(--purple);
+  --color-sys-pink: var(--pink);
+  --color-sys-gray: var(--gray);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+
+  --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+html,
+body {
+  background: var(--bg);
+  color: var(--label);
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+  [tabindex="-1"]:focus {
+    outline: none;
+  }
+
+  /* Our own clear button replaces the native one */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .fade-x {
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 24px), transparent 100%);
+  }
+  .balance {
+    text-wrap: balance;
+  }
+  .pretty {
+    text-wrap: pretty;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fill) transparent;
+  }
+}
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+@layer components {
+  .material {
+    background: var(--material);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 22px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .hairline-b {
+    box-shadow: inset 0 -0.5px 0 var(--separator);
+  }
+  .hairline-t {
+    box-shadow: inset 0 0.5px 0 var(--separator);
+  }
+  .hairline-l {
+    box-shadow: inset 0.5px 0 0 var(--separator);
+  }
+
+  /* iOS inset grouped list */
+  .group-list {
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .group-list > * + * {
+    box-shadow: inset 0 0.5px 0 var(--separator);
+  }
+  .sheet .group-list {
+    background: var(--surface);
+  }
+  .dark .sheet .group-list {
+    background: var(--surface-2);
+  }
+
+  .pressable {
+    transition: transform 0.2s var(--ease-apple), background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .pressable:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 90%, #fff);
+  }
+  .btn-gray {
+    background: var(--fill);
+    color: var(--label);
+  }
+  .btn-gray:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--fill) 100%, var(--label) 5%);
+  }
+  .btn-tinted {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  .btn-tinted:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 8%);
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fill);
+    color: var(--label);
+  }
+
+  .glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: 8px;
+    color: #fff;
+  }
+
+  .field {
+    background: var(--fill);
+    color: var(--label);
+    border-radius: 11px;
+    transition: box-shadow 0.2s ease;
+  }
+  .field::placeholder {
+    color: var(--label-2);
+  }
+  .field:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  /* Segmented control */
+  .segmented {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    padding: 2px;
+    border-radius: 10px;
+    background: var(--fill);
+  }
+  .segmented-thumb {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgb(0 0 0 / 0.12), 0 3px 1px rgb(0 0 0 / 0.04);
+    transition: transform 0.35s var(--ease-apple);
+  }
+  .dark .segmented-thumb {
+    background: #636366;
+  }
+  .segmented-item {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--label);
+    white-space: nowrap;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .segmented-item[aria-selected="true"] {
+    font-weight: 600;
+  }
+
+  .sheet {
+    background: var(--bg);
+    animation: sheet-up 0.48s var(--ease-apple) both;
+  }
+  .dark .sheet {
+    background: var(--surface);
+  }
+  @media (min-width: 640px) {
+    .sheet {
+      animation: pop-in 0.38s var(--ease-apple) both;
+    }
+  }
+  .sheet-sticky {
+    background: var(--bg);
+  }
+  .dark .sheet-sticky {
+    background: var(--surface);
+  }
+
+  /* Highlighted clinical tokens inside transcripts */
+  .mark-dose {
+    background: color-mix(in srgb, var(--orange) 16%, transparent);
+    color: color-mix(in srgb, var(--orange) 70%, var(--label));
+    border-radius: 5px;
+    padding: 0 3px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .mark-drug {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--green) 70%, transparent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+
+  /* Apple Intelligence–style multicolour glow around the live microphone */
+  .ai-glow {
+    position: absolute;
+    border-radius: 9999px;
+    background: conic-gradient(from 0deg, #0a84ff, #5e5ce6, #bf5af2, #ff375f, #ff9f0a, #30d158, #0a84ff);
+    filter: blur(16px);
+    animation: spin 5s linear infinite;
+  }
+  .ai-ring {
+    position: absolute;
+    border-radius: 9999px;
+    padding: 3px;
+    background: conic-gradient(from 0deg, #0a84ff, #5e5ce6, #bf5af2, #ff375f, #ff9f0a, #30d158, #0a84ff);
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    animation: spin 5s linear infinite;
+  }
+  .mic-hero {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 78%, #fff) 0%, var(--accent) 100%);
+    box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--accent) 85%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  }
+}
+
+/* ==========================================================================
+   Motion
+   ========================================================================== */
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px) scale(0.97);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.18;
+  }
+}
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.anim-fade {
+  animation: fade-in 0.25s ease both;
+}
+.anim-rise {
+  animation: rise-in 0.45s var(--ease-apple) both;
+}
+.anim-pop {
+  animation: pop-in 0.38s var(--ease-apple) both;
+}
+.anim-toast {
+  animation: toast-in 0.5s cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+.anim-breathe {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+.anim-dot {
+  animation: dot 1.2s ease-in-out infinite;
+}
+.anim-progress {
+  transform-origin: left center;
+  animation: progress 1s var(--ease-apple) both;
+}
+.shimmer-text {
+  background: linear-gradient(90deg, var(--label-2) 0%, var(--label) 40%, var(--label-2) 80%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
