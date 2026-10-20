@@ -2,7 +2,7 @@ import { Type } from '@google/genai';
 import { type Express, json, Router } from 'express';
 import { getLanguage } from '../shared/languages';
 import { combineLayers, mergeFacts } from '../shared/medical/anamnesis';
-import { canonicalKey, DialogueState, extractFacts } from '../shared/medical/extract';
+import { canonicalKey, DialogueState, drugIdentity, extractFacts } from '../shared/medical/extract';
 import { type TermInfo, type TermKind, termKey } from '../shared/medical/terms';
 import { fuseSpeaker } from '../shared/speaker';
 import { fold, words } from '../shared/text';
@@ -128,7 +128,7 @@ export function mountRoutes(app: Express): void {
   api.post('/anamnesis', rateLimit('anamnesis', 40), async (req, res) => {
     const body = req.body as Partial<AnamnesisRequest>;
     const lang = cleanString(body?.languageName, 60) || 'Yabancı dil';
-    const turns = readTurns(body?.turns, 60);
+    const turns = readTurns(body?.turns, 80);
     const known: Fact[] = (Array.isArray(body?.facts) ? body.facts : [])
       .slice(0, 150)
       .filter((f) => CATEGORIES.includes(f?.category))
@@ -181,8 +181,8 @@ export function mountRoutes(app: Express): void {
         },
         required: ['facts'],
       },
-      timeoutMs: 12000,
-      temperature: 0.1,
+      timeoutMs: 15000,
+      temperature: 0,
     });
 
     if (!out?.facts) {
@@ -207,6 +207,23 @@ export function mountRoutes(app: Express): void {
       })
       // Grounding: every new fact must quote the conversation; carried-over facts must already be known
       .filter((f) => (f.evidence ? isGrounded(f.evidence, turns) : knownKeys.has(f.key)));
+
+    // Safety net: an allergy the dialogue logic is sure of (a substance named in reply
+    // to an allergy question) overrides an AI reading of it as a medication
+    const localAllergies = localAnamnesis(turns, []).filter((f) => f.category === 'allergy' && !f.negated && !f.key.endsWith('__none__'));
+    for (const la of localAllergies) {
+      const id = drugIdentity(la.text);
+      const same = (f: { text: string }) => (id ? drugIdentity(f.text) === id : fold(f.text).startsWith(fold(la.text)));
+      for (const f of facts) {
+        if (f.category === 'medication' && !f.negated && same(f)) {
+          f.category = 'allergy';
+          f.key = canonicalKey('allergy', f.text);
+        }
+      }
+      if (!facts.some((f) => f.category === 'allergy' && same(f))) {
+        facts.push({ key: la.key, category: 'allergy', text: la.text, negated: undefined, evidence: la.evidence, turnId: la.turnId });
+      }
+    }
 
     const retracted = (out.retracted ?? [])
       .map((r) => cleanString(r, 160))

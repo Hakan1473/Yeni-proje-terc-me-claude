@@ -8,6 +8,7 @@ import {
   Copy,
   HandHeart,
   HeartPulse,
+  Info,
   type LucideIcon,
   Pill,
   Scissors,
@@ -200,9 +201,13 @@ export function AnamnesisPanel() {
               );
             })}
           </div>
-          <p className="px-2 pt-2 pb-4 text-[12px] text-label-3 leading-snug">
-            Tıbbi terime dokunarak kısa bilgi kartını açabilirsiniz. Otomatik çıkarımdır; klinik doğrulama gerektirir.
-          </p>
+          <div className="mt-2 mb-4 flex items-start gap-2.5 rounded-[14px] bg-fill-2 px-3.5 py-3">
+            <Info className="w-4 h-4 text-label-2 shrink-0 mt-[1px]" strokeWidth={2.25} />
+            <p className="text-[12.5px] text-label-2 leading-snug">
+              <span className="font-semibold text-label">Yapay zekâ hata yapabilir.</span> Alerji, ilaç ve doz bilgilerini uygulamadan önce
+              hastayla doğrulayın. Tıbbi terime dokunarak kısa bilgi kartını açabilirsiniz.
+            </p>
+          </div>
         </>
       )}
 

@@ -1,4 +1,5 @@
 import type { Fact, FactCategory } from '../types';
+import { drugIdentity } from './extract';
 
 export const CATEGORY_ORDER: FactCategory[] = [
   'complaint',
@@ -98,6 +99,12 @@ export function combineLayers(local: Fact[], ai: AiLayer | null): Fact[] {
     }
     result = Array.from(byKey.values());
   }
+
+  // A drug the patient is allergic to is never also listed as their medication: an
+  // answer to "any allergies?" that only names drugs must not read as a drug list
+  const allergic = new Set(result.filter((f) => f.category === 'allergy' && !f.negated).map((f) => drugIdentity(f.text)));
+  allergic.delete(null);
+  if (allergic.size) result = result.filter((f) => !(f.category === 'medication' && !f.negated && allergic.has(drugIdentity(f.text))));
 
   // "Bilinen alerji yok" is meaningless once an allergy is known
   const positives = new Set(result.filter((f) => !f.negated).map((f) => f.category));

@@ -396,6 +396,123 @@ button {
     filter: drop-shadow(0 1px 1.5px rgb(30 40 110 / 0.35)) drop-shadow(0 0 8px rgb(30 40 110 / 0.18));
   }
 
+  /* Dock: a floating glass capsule with the voice sphere set into its middle */
+  .dock {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    backdrop-filter: saturate(180%) blur(28px);
+    -webkit-backdrop-filter: saturate(180%) blur(28px);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      0 0 0 0.5px var(--separator),
+      0 2px 6px rgb(0 0 0 / 0.04),
+      0 18px 40px -18px rgb(30 40 90 / 0.28);
+  }
+  .dark .dock {
+    background: rgb(44 44 46 / 0.66);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.09),
+      0 0 0 0.5px rgb(255 255 255 / 0.08),
+      0 18px 44px -16px rgb(0 0 0 / 0.75);
+  }
+  .dock-orb {
+    display: flex;
+    margin: -8px 8px;
+  }
+  .dock-key {
+    width: 64px;
+    height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 9999px;
+    color: var(--label);
+    transition: background-color 0.25s ease, color 0.25s ease, transform 0.3s var(--ease-apple), opacity 0.25s ease;
+  }
+  .dock-key:first-child {
+    border-radius: 28px 22px 22px 28px;
+  }
+  .dock-key:last-child {
+    border-radius: 22px 28px 28px 22px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .dock-key:hover:not(:disabled) {
+      background: var(--fill-2);
+    }
+  }
+  .dock-key:active:not(:disabled) {
+    background: var(--fill);
+    transform: scale(0.94);
+    transition-duration: 0.08s;
+  }
+  .dock-key:disabled {
+    opacity: 0.32;
+  }
+  .dock-key-face {
+    display: flex;
+    transition: transform 0.35s cubic-bezier(0.34, 1.5, 0.64, 1);
+  }
+  .dock-key:active:not(:disabled) .dock-key-face {
+    transform: translateY(1px);
+  }
+  .dock-key-label {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.005em;
+    color: var(--label-2);
+  }
+  .dock-key[data-tone="danger"] {
+    color: var(--red);
+    background: color-mix(in srgb, var(--red) 12%, transparent);
+  }
+  .dock-key[data-tone="danger"] .dock-key-label,
+  .dock-key[data-tone="accent"] .dock-key-label {
+    color: inherit;
+    font-weight: 600;
+  }
+  .dock-key[data-tone="accent"] {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .dock-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    height: 30px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.006em;
+    color: var(--label-2);
+  }
+  .dock-status-dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--tone);
+    transition: background-color 0.3s ease;
+  }
+  .dock-status-dot.is-live {
+    animation: live-dot 2s ease-out infinite;
+  }
+  .dock-ellipsis::after {
+    content: "";
+    display: inline-block;
+    width: 1.2em;
+    text-align: left;
+    animation: ellipsis 1.2s steps(4, end) infinite;
+  }
+
   /* Grouped-list rows: highlight on press like UITableView */
   .row-press {
     transition: background-color 0.25s ease;
@@ -512,6 +629,29 @@ button {
 }
 .anim-toast {
   animation: toast-in 0.5s cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+@keyframes live-dot {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--tone) 0%, transparent);
+  }
+}
+@keyframes ellipsis {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
 }
 @keyframes glyph-in {
   from {

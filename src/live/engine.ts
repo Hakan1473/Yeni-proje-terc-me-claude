@@ -104,7 +104,10 @@ class Engine {
     input: (text) => this.onInput(text),
     output: (text) => this.onOutput(text),
     audio: (pcm) => this.onAudio(pcm),
-    turnComplete: () => this.onTurnComplete(),
+    turnComplete: () => {
+      speaker.endLive();
+      this.onTurnComplete();
+    },
     interrupted: () => {
       if (speaker.current === 'live') speaker.stop();
     },
@@ -334,7 +337,8 @@ class Engine {
     if (open) {
       open.hadOutput = true;
       this.cancelFallback(open);
-      this.store.set({ playingTurnId: open.id });
+      // Audio arrives every few tens of ms: only touch the store (and React) on change
+      if (this.store.get().playingTurnId !== open.id) this.store.set({ playingTurnId: open.id });
     }
     speaker.playPcm(pcm);
   }

@@ -11,15 +11,16 @@ interface Hooks {
   publish(facts: Fact[], status: AiStatus, syncedAt: number | null): void;
 }
 
-const DEBOUNCE_MS = 1400;
-const CONTEXT_TURNS = 4;
+const DEBOUNCE_MS = 1200;
+const MAX_TURNS = 80;
 
 /**
  * Two-layer live anamnesis.
  *   Local layer: deterministic extraction on every finished turn (instant).
- *   AI layer: debounced, incremental pass that sends only turns the AI has
- *   not seen yet plus the current fact list, so cost grows linearly with the
- *   conversation instead of quadratically. See combineLayers() for merging.
+ *   AI layer: debounced pass over the whole conversation (up to MAX_TURNS) plus
+ *   the current fact list. Rereading everything each time lets the AI see which
+ *   question an answer belongs to ("Any allergies?" → "Yes. Amlodis, Avil.")
+ *   and correct its own earlier mistakes. See combineLayers() for merging.
  */
 export class AnamnesisSync {
   private local: Fact[] = [];
@@ -59,8 +60,7 @@ export class AnamnesisSync {
     const watermark = this.ai?.watermark ?? 0;
     const fresh = done.filter((t) => t.createdAt > watermark);
     if (fresh.length === 0) return;
-    const first = done.indexOf(fresh[0]);
-    const context = done.slice(Math.max(0, first - CONTEXT_TURNS), first);
+    const recent = done.slice(-MAX_TURNS);
     const known = combineLayers(this.local, this.ai);
     const controller = new AbortController();
     this.inFlight = controller;
@@ -70,10 +70,7 @@ export class AnamnesisSync {
         {
           languageName: this.hooks.languageName(),
           facts: known.map(({ category, text, negated }) => ({ category, text, negated })),
-          turns: [
-            ...context.map((t) => ({ id: t.id, speaker: t.speaker, source: t.source, translation: t.translation, context: true })),
-            ...fresh.map((t) => ({ id: t.id, speaker: t.speaker, source: t.source, translation: t.translation })),
-          ],
+          turns: recent.map((t) => ({ id: t.id, speaker: t.speaker, source: t.source, translation: t.translation })),
         },
         controller.signal,
       );

@@ -3,10 +3,12 @@ import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'rea
 import { LANGUAGES } from '../../shared/languages';
 import type { Turn } from '../../shared/types';
 import { checkAccess } from '../lib/api';
+import { patientHint } from '../lib/patientHints';
 import { setAccessCode } from '../lib/settings';
 import { useStore } from '../lib/store';
 import { engine } from '../live/engine';
 import { Flag, Sheet } from './ui';
+import { DockKey } from './Dock';
 import { Orb, OrbArt } from './Orb';
 
 // ───────────────────────── Toast ─────────────────────────
@@ -154,9 +156,15 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
     <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-12 py-6">
       <div className="text-[13px] font-semibold text-label-2 flex items-center gap-2">{label}</div>
       <div className="flex-1 min-h-0 flex items-center overflow-y-auto">
-        <p dir="auto" className={`w-full text-[clamp(26px,5.2vw,52px)] leading-[1.18] font-semibold tracking-[-0.025em] balance ${text ? tone : 'text-label-3'}`}>
-          {text ?? placeholder}
-        </p>
+        {text ? (
+          <p dir="auto" key={text} className={`w-full text-[clamp(26px,5.2vw,52px)] leading-[1.18] font-semibold tracking-[-0.025em] balance anim-fade ${tone}`}>
+            {text}
+          </p>
+        ) : (
+          <p dir="auto" className="w-full max-w-[34ch] text-[clamp(20px,3.2vw,30px)] leading-[1.3] font-medium tracking-[-0.018em] text-label-2 balance">
+            {placeholder}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -170,26 +178,19 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
             <Flag iso={language.flag} label={language.nameTr} size="xs" />
             <span dir="auto">{language.native}</span>
           </>,
-          '…',
+          patientHint(language.code),
           'text-patient',
         )}
       </div>
-      <div className="relative shrink-0 h-[60px] flex items-center justify-center gap-3 px-4">
+      <div className="relative shrink-0 flex items-center justify-center px-4 py-2">
         <span className="absolute inset-x-0 top-1/2 h-px bg-separator" aria-hidden="true" />
-        <button type="button" onClick={onClose} aria-label="Kapat" className="pressable relative w-11 h-11 rounded-full bg-surface shadow-card flex items-center justify-center cursor-pointer">
-          <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
-        </button>
-        <Orb size={56} />
-        <button
-          type="button"
-          onClick={() => setFlipped((f) => !f)}
-          aria-pressed={flipped}
-          aria-label="Üst yarıyı karşıya çevir"
-          title="Üst yarıyı karşıya çevir"
-          className={`pressable relative w-11 h-11 rounded-full flex items-center justify-center cursor-pointer ${flipped ? 'bg-accent text-white' : 'bg-surface shadow-card'}`}
-        >
-          <RotateCw className="w-5 h-5" strokeWidth={2.25} />
-        </button>
+        <nav aria-label="Karşılıklı görünüm kontrolleri" className="dock relative">
+          <DockKey icon={ChevronLeft} label="Kapat" onClick={onClose} />
+          <span className="dock-orb">
+            <Orb size={64} />
+          </span>
+          <DockKey icon={RotateCw} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
+        </nav>
       </div>
       {half(
         staffText,
@@ -197,7 +198,7 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
           <Flag iso="tr" label="Türkçe" size="xs" />
           Türkçe · Personel
         </>,
-        'Konuştuğunuzda çeviri burada büyük yazıyla görünür; üst yarı hastaya döner.',
+        'Konuştuğunuzda çeviri burada büyük yazıyla görünür. Üst yarı hastaya döner ve ona aynı açıklamayı kendi dilinde gösterir.',
         'text-label',
       )}
     </div>

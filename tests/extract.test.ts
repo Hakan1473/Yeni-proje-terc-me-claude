@@ -80,6 +80,21 @@ describe('extractFacts', () => {
         f.startsWith('allergy'),
       ),
     ).toEqual([]);
+    // Naming drugs in reply to an allergy question lists allergies, even without "I am allergic"
+    expect(view(dialogue([['nurse', 'İlaç alerjiniz var mı?'], ['patient', 'Evet. Amlodis, Avil.']]))).toEqual([
+      'allergy: Amlodis (amlodipin)',
+      'allergy: Avil (feniramin)',
+    ]);
+    expect(view(dialogue([['nurse', 'Herhangi bir alerjiniz var mı?'], ['patient', 'Evet, Xyzal ve çilek.']]))).toEqual([
+      'allergy: Xyzal',
+      'allergy: Çilek',
+    ]);
+    expect(view(dialogue([['nurse', 'Alerjiniz var mı?'], ['patient', 'Evet, penisiline.']]))).toEqual(['allergy: Penisilin']);
+    // Taking a drug is still a medication
+    expect(view(dialogue([['nurse', 'Alerjiniz var mı?'], ['patient', 'Yok, ama Avil kullanıyorum.']]))).toEqual([
+      'medication: Avil (feniramin)',
+      'allergy!: Bilinen alerji yok',
+    ]);
     expect(view(dialogue([['nurse', 'Ağrınızı 1 ile 10 arasında puanlar mısınız?'], ['patient', 'Yedi.']]))).toEqual([
       'complaint: Ağrı şiddeti: 7/10',
     ]);

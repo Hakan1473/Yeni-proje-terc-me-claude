@@ -1,83 +1,93 @@
-import { FileText, Keyboard, Mic, MicOff, ScanText } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { FileText, Keyboard, type LucideIcon, Mic, MicOff, ScanText } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { engine, type SessionState } from '../live/engine';
 import { Orb } from './Orb';
 
 const CAPTION: Record<SessionState, { title: string; tone: string }> = {
-  idle: { title: 'Tercümanı başlatmak için dokunun', tone: 'bg-label-3' },
-  connecting: { title: 'Bağlanıyor…', tone: 'bg-sys-orange' },
-  reconnecting: { title: 'Bağlantı yenileniyor…', tone: 'bg-sys-orange' },
-  listening: { title: 'Dinliyorum · Türkçe veya hasta dilinde konuşun', tone: 'bg-sys-green' },
-  hearing: { title: 'Konuşma algılanıyor', tone: 'bg-sys-green' },
-  translating: { title: 'Çevriliyor…', tone: 'bg-accent' },
-  speaking: { title: 'Seslendiriliyor · Geçmek için dokunun', tone: 'bg-accent' },
+  idle: { title: 'Başlatmak için küreye dokunun', tone: 'var(--label-3)' },
+  connecting: { title: 'Bağlanıyor', tone: 'var(--orange)' },
+  reconnecting: { title: 'Bağlantı yenileniyor', tone: 'var(--orange)' },
+  listening: { title: 'Dinliyorum · Türkçe veya hasta dilinde konuşun', tone: 'var(--green)' },
+  hearing: { title: 'Konuşma algılanıyor', tone: 'var(--green)' },
+  translating: { title: 'Çevriliyor', tone: 'var(--accent)' },
+  speaking: { title: 'Seslendiriliyor · Geçmek için küreye dokunun', tone: 'var(--accent)' },
 };
 
-function DockButton({
-  icon,
+/** A key in the dock: glyph over a short label, tinted when it is switched on. */
+export function DockKey({
+  icon: Icon,
   label,
   onClick,
-  active,
-  danger,
+  tone,
   disabled,
+  pressed,
 }: {
-  icon: ReactNode;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
-  active?: boolean;
-  danger?: boolean;
+  tone?: 'danger' | 'accent';
   disabled?: boolean;
+  pressed?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-pressed={active}
-      className="pressable group flex flex-col items-center gap-1 w-[64px] cursor-pointer disabled:opacity-40 disabled:cursor-default"
+      aria-pressed={pressed}
+      data-tone={tone}
+      className="dock-key group cursor-pointer disabled:cursor-default"
     >
-      <span
-        className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
-          danger ? 'bg-sys-red/15 text-sys-red' : active ? 'bg-accent text-white' : 'bg-fill text-label group-hover:bg-surface-3'
-        }`}
-      >
-        {icon}
+      <span className="dock-key-face">
+        <Icon className="w-[21px] h-[21px]" strokeWidth={1.9} />
       </span>
-      <span className={`text-[11px] font-medium leading-none ${danger ? 'text-sys-red' : 'text-label-2'}`}>{label}</span>
+      <span className="dock-key-label">{label}</span>
     </button>
   );
 }
 
-export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; onFaceToFace: () => void; onSummary: () => void }) {
+function Status() {
   const session = useStore(engine.store, (s) => s.session);
   const muted = useStore(engine.store, (s) => s.muted);
+  const caption = muted && session !== 'idle' ? { title: 'Mikrofon kapalı · Ses algılanmıyor', tone: 'var(--red)' } : CAPTION[session];
+  const live = session === 'listening' || session === 'hearing';
+  const working = session === 'connecting' || session === 'reconnecting' || session === 'translating';
+  return (
+    <p className="dock-status" aria-live="polite">
+      <span className={`dock-status-dot ${live && !muted ? 'is-live' : ''}`} style={{ '--tone': caption.tone } as React.CSSProperties} />
+      <span className="truncate">{caption.title}</span>
+      {working && <span className="dock-ellipsis" aria-hidden="true" />}
+    </p>
+  );
+}
+
+export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; onFaceToFace: () => void; onSummary: () => void }) {
+  const muted = useStore(engine.store, (s) => s.muted);
   const hasTurns = useStore(engine.store, (s) => s.items.some((i) => i.kind === 'turn'));
-  const caption = muted && session !== 'idle' ? { title: 'Mikrofon kapalı · Ses algılanmıyor', tone: 'bg-sys-red' } : CAPTION[session];
 
   return (
-    <footer className="relative z-20 material hairline-t pb-safe shrink-0 select-none">
-      <p className="flex items-center justify-center gap-2 pt-2.5 px-4 text-[13px] text-label-2 text-center" aria-live="polite">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${caption.tone} ${session === 'listening' || session === 'hearing' ? 'animate-pulse' : ''}`} />
-        <span className="truncate">{caption.title}</span>
-      </p>
-      <div className="flex items-center justify-center gap-1 sm:gap-4 pt-2 pb-2">
-        <DockButton icon={<Keyboard className="w-5 h-5" strokeWidth={2} />} label="Yaz" onClick={onType} />
-        <DockButton
-          icon={muted ? <MicOff className="w-5 h-5" strokeWidth={2} /> : <Mic className="w-5 h-5" strokeWidth={2} />}
-          label={muted ? 'Sessizde' : 'Sessiz'}
-          danger={muted}
-          onClick={() => engine.setMuted(!muted)}
-        />
-        <div className="mx-2 sm:mx-4">
-          <Orb />
-        </div>
-        <DockButton icon={<ScanText className="w-5 h-5" strokeWidth={2} />} label="Hastaya" onClick={onFaceToFace} />
-        <DockButton icon={<FileText className="w-5 h-5" strokeWidth={2} />} label="Özet" onClick={onSummary} disabled={!hasTurns} />
+    <footer className="relative z-20 shrink-0 select-none pb-safe">
+      <div className="flex flex-col items-center px-3 pt-1">
+        <Status />
+        <nav aria-label="Tercüman kontrolleri" className="dock">
+          <DockKey icon={Keyboard} label="Yaz" onClick={onType} />
+          <DockKey
+            icon={muted ? MicOff : Mic}
+            label={muted ? 'Sessizde' : 'Sessiz'}
+            tone={muted ? 'danger' : undefined}
+            pressed={muted}
+            onClick={() => engine.setMuted(!muted)}
+          />
+          <span className="dock-orb">
+            <Orb size={72} />
+          </span>
+          <DockKey icon={ScanText} label="Hastaya" onClick={onFaceToFace} />
+          <DockKey icon={FileText} label="Özet" onClick={onSummary} disabled={!hasTurns} />
+        </nav>
+        <p className="pt-1.5 pb-1 text-center text-[10.5px] text-label-3">
+          <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur
+        </p>
       </div>
-      <p className="pb-1.5 text-center text-[10.5px] text-label-3">
-        <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur
-      </p>
     </footer>
   );
 }

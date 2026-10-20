@@ -1,0 +1,72 @@
+/**
+ * What the patient half of the face-to-face screen says before anyone has
+ * spoken, in the patient's language: "When the nurse speaks, the translation
+ * appears here in large text. You can speak in your own language."
+ */
+const HINTS: Record<string, string> = {
+  en: 'When the nurse speaks, the translation will appear here in large text. You can speak in your own language.',
+  ar: 'عندما تتحدث الممرضة، ستظهر الترجمة هنا بخط كبير. يمكنك التحدث بلغتك.',
+  ru: 'Когда медсестра говорит, перевод появится здесь крупным шрифтом. Вы можете говорить на своём языке.',
+  de: 'Wenn die Pflegekraft spricht, erscheint die Übersetzung hier in großer Schrift. Sie können in Ihrer eigenen Sprache sprechen.',
+  fr: 'Quand l’infirmière parle, la traduction s’affiche ici en grands caractères. Vous pouvez parler dans votre langue.',
+  ro: 'Când asistenta vorbește, traducerea va apărea aici cu litere mari. Puteți vorbi în limba dumneavoastră.',
+  zh: '护士说话时，翻译会以大字显示在这里。您可以用自己的语言说话。',
+  it: 'Quando l’infermiera parla, la traduzione apparirà qui a caratteri grandi. Può parlare nella sua lingua.',
+  es: 'Cuando la enfermera hable, la traducción aparecerá aquí en letra grande. Puede hablar en su idioma.',
+  ja: '看護師が話すと、ここに翻訳が大きな文字で表示されます。ご自分の言語で話してください。',
+  fa: 'وقتی پرستار صحبت می‌کند، ترجمه با حروف درشت اینجا نمایش داده می‌شود. می‌توانید به زبان خودتان صحبت کنید.',
+  ka: 'როცა ექთანი ლაპარაკობს, თარგმანი აქ დიდი ასოებით გამოჩნდება. შეგიძლიათ ისაუბროთ თქვენს ენაზე.',
+  az: 'Tibb bacısı danışanda tərcümə burada iri hərflərlə görünəcək. Siz öz dilinizdə danışa bilərsiniz.',
+  uz: 'Hamshira gapirganda, tarjima shu yerda katta harflarda paydo bo‘ladi. O‘z tilingizda gapirishingiz mumkin.',
+  tk: 'Şepagat uýasy gürlände, terjime şu ýerde uly harplar bilen görüner. Siz öz diliňizde gürläp bilersiňiz.',
+  kk: 'Мейірбике сөйлегенде, аударма осы жерде ірі әріптермен көрсетіледі. Өз тіліңізде сөйлей аласыз.',
+  ky: 'Медайым сүйлөгөндө, котормо бул жерде чоң тамгалар менен чыгат. Өз тилиңизде сүйлөй аласыз.',
+  uk: 'Коли медсестра говорить, переклад з’явиться тут великим шрифтом. Ви можете говорити своєю мовою.',
+  sr: 'Kada medicinska sestra govori, prevod će se pojaviti ovde velikim slovima. Možete govoriti na svom jeziku.',
+  bs: 'Kada medicinska sestra govori, prijevod će se pojaviti ovdje velikim slovima. Možete govoriti na svom jeziku.',
+  hr: 'Kada medicinska sestra govori, prijevod će se pojaviti ovdje velikim slovima. Možete govoriti na svom jeziku.',
+  bg: 'Когато медицинската сестра говори, преводът ще се появи тук с едър шрифт. Можете да говорите на своя език.',
+  el: 'Όταν μιλά η νοσηλεύτρια, η μετάφραση θα εμφανίζεται εδώ με μεγάλα γράμματα. Μπορείτε να μιλάτε στη γλώσσα σας.',
+  pl: 'Gdy pielęgniarka mówi, tłumaczenie pojawi się tutaj dużą czcionką. Może Pan/Pani mówić we własnym języku.',
+  nl: 'Wanneer de verpleegkundige spreekt, verschijnt de vertaling hier in grote letters. U kunt in uw eigen taal spreken.',
+  pt: 'Quando a enfermeira falar, a tradução aparecerá aqui em letras grandes. Pode falar na sua língua.',
+  ko: '간호사가 말하면 번역이 여기에 큰 글씨로 표시됩니다. 모국어로 말씀하셔도 됩니다.',
+  hi: 'जब नर्स बोलेंगी, अनुवाद यहाँ बड़े अक्षरों में दिखाई देगा। आप अपनी भाषा में बोल सकते हैं।',
+  ur: 'جب نرس بات کرے گی تو ترجمہ یہاں بڑے حروف میں نظر آئے گا۔ آپ اپنی زبان میں بات کر سکتے ہیں۔',
+  bn: 'নার্স কথা বললে অনুবাদটি এখানে বড় অক্ষরে দেখা যাবে। আপনি নিজের ভাষায় কথা বলতে পারেন।',
+  ku: 'Dema hemşîre diaxive, werger li vir bi tîpên mezin xuya dibe. Hûn dikarin bi zimanê xwe biaxivin.',
+  sq: 'Kur infermierja flet, përkthimi do të shfaqet këtu me shkronja të mëdha. Mund të flisni në gjuhën tuaj.',
+  so: 'Marka kalkaalisadu hadasho, turjumaaddu halkan ayay ka muuqan doontaa iyadoo far waaweyn ah. Waxaad ku hadli kartaa luqaddaada.',
+  ps: 'کله چې نرس خبرې کوي، ژباړه به دلته په لویو تورو ښکاره شي. تاسو کولی شئ په خپله ژبه خبرې وکړئ.',
+  he: 'כשהאחות מדברת, התרגום יופיע כאן באותיות גדולות. אפשר לדבר בשפה שלך.',
+  sv: 'När sjuksköterskan talar visas översättningen här med stor text. Du kan tala ditt eget språk.',
+  no: 'Når sykepleieren snakker, vises oversettelsen her med stor skrift. Du kan snakke ditt eget språk.',
+  da: 'Når sygeplejersken taler, vises oversættelsen her med stor skrift. Du kan tale dit eget sprog.',
+  fi: 'Kun hoitaja puhuu, käännös näkyy tässä isolla tekstillä. Voit puhua omalla kielelläsi.',
+  hu: 'Amikor az ápoló beszél, a fordítás itt jelenik meg nagy betűkkel. Beszélhet a saját nyelvén.',
+  cs: 'Když sestra mluví, překlad se zobrazí zde velkým písmem. Můžete mluvit svým jazykem.',
+  sk: 'Keď sestra hovorí, preklad sa zobrazí tu veľkým písmom. Môžete hovoriť vo svojom jazyku.',
+  sl: 'Ko medicinska sestra govori, se prevod prikaže tukaj z velikimi črkami. Govorite lahko v svojem jeziku.',
+  mk: 'Кога медицинската сестра зборува, преводот ќе се појави тука со големи букви. Можете да зборувате на својот јазик.',
+  id: 'Saat perawat berbicara, terjemahannya akan muncul di sini dengan huruf besar. Anda dapat berbicara dalam bahasa Anda sendiri.',
+  ms: 'Apabila jururawat bercakap, terjemahan akan dipaparkan di sini dalam huruf besar. Anda boleh bercakap dalam bahasa anda sendiri.',
+  th: 'เมื่อพยาบาลพูด คำแปลจะแสดงที่นี่เป็นตัวอักษรขนาดใหญ่ คุณพูดเป็นภาษาของคุณได้',
+  vi: 'Khi y tá nói, bản dịch sẽ hiện ở đây bằng chữ lớn. Bạn có thể nói bằng ngôn ngữ của mình.',
+  tl: 'Kapag nagsalita ang nars, lalabas dito ang salin sa malalaking titik. Maaari kang magsalita sa sarili mong wika.',
+  sw: 'Muuguzi anapozungumza, tafsiri itaonekana hapa kwa herufi kubwa. Unaweza kuzungumza kwa lugha yako.',
+  hy: 'Երբ բուժքույրը խոսում է, թարգմանությունը կհայտնվի այստեղ խոշոր տառերով։ Կարող եք խոսել ձեր լեզվով։',
+  lt: 'Kai slaugytoja kalba, vertimas čia pasirodys dideliu šriftu. Galite kalbėti savo kalba.',
+  lv: 'Kad medmāsa runā, tulkojums šeit parādīsies lieliem burtiem. Jūs varat runāt savā valodā.',
+  et: 'Kui õde räägib, ilmub tõlge siia suurte tähtedega. Võite rääkida oma keeles.',
+  am: 'ነርሷ ስትናገር ትርጉሙ እዚህ በትልቅ ፊደል ይታያል። በራስዎ ቋንቋ መናገር ይችላሉ።',
+  mn: 'Сувилагч ярихад орчуулга энд том үсгээр гарна. Та өөрийн хэлээр ярьж болно.',
+  ne: 'नर्स बोल्दा अनुवाद यहाँ ठूला अक्षरमा देखिन्छ। तपाईं आफ्नै भाषामा बोल्न सक्नुहुन्छ।',
+  pa: 'ਜਦੋਂ ਨਰਸ ਬੋਲੇਗੀ, ਅਨੁਵਾਦ ਇੱਥੇ ਵੱਡੇ ਅੱਖਰਾਂ ਵਿੱਚ ਦਿਖਾਈ ਦੇਵੇਗਾ। ਤੁਸੀਂ ਆਪਣੀ ਭਾਸ਼ਾ ਵਿੱਚ ਬੋਲ ਸਕਦੇ ਹੋ।',
+  ta: 'செவிலியர் பேசும்போது, மொழிபெயர்ப்பு இங்கே பெரிய எழுத்துகளில் தோன்றும். நீங்கள் உங்கள் மொழியில் பேசலாம்.',
+};
+
+export function patientHint(code: string): string {
+  return HINTS[code] ?? HINTS.en;
+}
+
+export const PATIENT_HINT_CODES = Object.keys(HINTS);

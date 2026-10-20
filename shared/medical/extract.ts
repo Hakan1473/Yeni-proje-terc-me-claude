@@ -166,8 +166,8 @@ function phonetic(text: string): string {
 }
 
 /** Recognizer misspellings of drug names ("ogmentin", "pantpaz"), only inside a medication context. */
-function fuzzyDrugHits(text: string, taken: Hit<DrugEntry>[]): Hit<DrugEntry>[] {
-  if (!MED_CONTEXT.test(text)) return [];
+function fuzzyDrugHits(text: string, taken: Hit<DrugEntry>[], anyContext = false): Hit<DrugEntry>[] {
+  if (!anyContext && !MED_CONTEXT.test(text)) return [];
   const out: Hit<DrugEntry>[] = [];
   for (const m of text.matchAll(/\p{L}{6,}/gu)) {
     const token = m[0];
@@ -554,6 +554,15 @@ function questionSubject(text: string, topic: Topic): Subject | undefined {
 
 const ANSWER_WINDOW_MS = 120_000;
 
+// Words in a short answer that are not substance names
+const ANSWER_FILLER =
+  /^(?:evet|var|vardır|tabii|tabi|elbette|aynen|maalesef|bir|de|da|ve|ile|veya|ya|bide|hem|şey|mesela|yani|ama|bu|şu|o|bunlar|onlar|ilaç\p{L}*|alerji\p{L}*|karşı|için|olarak|çok|biraz|bazı|tane|iki|üç)$/u;
+// An unsure or narrative reply is not a list of allergens
+const ANSWER_DOUBT = /(?<!\p{L})(?:bilmiyorum|emin değilim|sanırım|galiba|herhalde|hatırlamıyorum|olabilir|belki)(?!\p{L})/u;
+// Inflected verbs and everyday words that cannot be a drug or allergen name
+const NOT_A_NAME =
+  /(?:[ıiuü]?yor\p{L}*|m[ıiuü]ş\p{L}*|[dt][ıiuü]m?|acak\p{L}*|ecek\p{L}*|l[ae]r\p{L}*)$|^(?:ben|sen|biz|siz|bana|beni|benim|hep|daha|sonra|önce|kez|defa|her|gün|ay|yıl|hafta|geçen|geçenlerde|doktor\p{L}*|hastane\p{L}*|sabah\p{L}*|akşam\p{L}*|şimdi|hiç|başka|hayır|yok)$/u;
+
 function answerPendingQuestion(
   lower: string,
   u: Utterance,
@@ -578,11 +587,37 @@ function answerPendingQuestion(
           : { key: 'allergy:__none__', category: 'allergy', text: 'Bilinen alerji yok', negated: true, evidence });
         return;
       }
-      // "Penisilin." as the whole answer to an allergy question names an allergen, not a medication
-      const named = [...findHits(lower, DRUG_M).map((h) => drugLabel(h.entry, h.alias)), ...findHits(lower, ALLERGEN_M).map((h) => h.entry.label)];
+      // "Evet. Amlodis, Avil." answering an allergy question lists allergens, not medications:
+      // the patient does not need to repeat "I am allergic to"
+      const drugHits = findHits(lower, DRUG_M);
+      const fuzzy = fuzzyDrugHits(lower, drugHits, true);
+      const allergenHits = findHits(lower, ALLERGEN_M);
+      const found: { at: number; label: string }[] = [
+        ...drugHits.map((h) => ({ at: h.start, label: drugLabel(h.entry, h.alias) })),
+        ...fuzzy.map((h) => ({ at: h.start, label: drugLabel(h.entry) })),
+        ...allergenHits.map((h) => ({ at: h.start, label: h.entry.label })),
+      ];
+      const spans = [...drugHits, ...fuzzy, ...allergenHits];
+      const content = words(lower).filter((w) => !ANSWER_FILLER.test(w));
       // Only a short answer that just names substances ("Evet, penisilin.") makes them allergens
-      const content = words(lower).filter((w) => !/^(evet|var|vardır|tabii|tabi|elbette|bir|de|da|ve|ile)$/u.test(w));
-      if (named.length && !MED_CONTEXT.test(lower) && content.length <= 5) {
+      let list = content.length > 0 && content.length <= 6 && !MED_CONTEXT.test(lower) && !ANSWER_DOUBT.test(lower);
+      if (list) {
+        // Names the lexicon does not know yet ("Evet, Xyzal") are still allergens in this answer
+        const unknown: typeof found = [];
+        for (const m of u.text.matchAll(/\p{L}[\p{L}-]{2,}/gu)) {
+          const w = lowerTr(m[0]);
+          const at = lower.indexOf(w);
+          if (ANSWER_FILLER.test(w) || spans.some((h) => at >= h.start && at < h.end)) continue;
+          if (NOT_A_NAME.test(w)) {
+            list = false;
+            break;
+          }
+          unknown.push({ at, label: capitalizeTr(m[0]) });
+        }
+        if (list) found.push(...unknown);
+      }
+      const named = found.sort((a, b) => a.at - b.at).map((f) => f.label);
+      if (list && named.length) {
         for (let i = drafts.length - 1; i >= 0; i--) if (drafts[i].category === 'medication') drafts.splice(i, 1);
         for (const label of named) add({ key: key('allergy', label), category: 'allergy', text: label, pinned: true, evidence });
       } else if (yes && q.subject) {
@@ -653,6 +688,12 @@ function answerPendingQuestion(
  * Map a free-text fact (e.g. from the AI layer: "Parol 500 mg") onto the same
  * key the local extractor would produce, so both layers deduplicate.
  */
+/** Active ingredient (or brand) a fact names, to spot one drug filed under two categories. */
+export function drugIdentity(text: string): string | null {
+  const h = findHits(lowerTr(text), DRUG_M)[0];
+  return h ? fold(h.entry.generic ?? h.entry.name) : null;
+}
+
 export function canonicalKey(category: FactCategory, text: string): string {
   const lower = lowerTr(text);
   switch (category) {

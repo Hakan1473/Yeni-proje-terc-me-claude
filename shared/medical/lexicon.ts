@@ -57,7 +57,7 @@ const DRUG_ROWS: [string, string | undefined, ...string[]][] = [
   ['Beloc', 'metoprolol', 'metoprolol', 'beloc zok', 'belok'],
   ['Concor', 'bisoprolol', 'bisoprolol', 'konkor', 'concor'],
   ['Dideral', 'propranolol', 'propranolol'],
-  ['Norvasc', 'amlodipin', 'amlodipin', 'amlodipine', 'norvask', 'amlovas'],
+  ['Norvasc', 'amlodipin', 'amlodipin', 'amlodipine', 'norvask', 'amlovas', 'amlodis', 'amlopin', 'monovas'],
   ['Delix', 'ramipril', 'ramipril', 'deliks'],
   ['Coversyl', 'perindopril', 'perindopril', 'koversil'],
   ['Micardis', 'telmisartan', 'telmisartan', 'mikardis', 'pritor'],

@@ -52,6 +52,24 @@ describe('combineLayers', () => {
     expect(combineLayers(local, ai).some((f) => f.key === 'allergy:penisilin')).toBe(false);
   });
 
+  it('never lists an allergy drug as a medication too', () => {
+    const ai = {
+      facts: [
+        { ...fact('medication:amlodipin', 'Amlodis (amlodipin)', 3), origin: 'ai' as const },
+        { ...fact('medication:feniramin', 'Avil (feniramin)', 3), origin: 'ai' as const },
+        { ...fact('medication:metformin', 'Glifor (metformin)', 3), origin: 'ai' as const },
+      ],
+      retracted: [],
+      watermark: 3,
+    };
+    const allergies = [fact('allergy:amlodis', 'Amlodis (amlodipin)', 2, { pinned: true }), fact('allergy:avil', 'Avil', 2, { pinned: true })];
+    expect(combineLayers(allergies, ai).map((f) => `${f.category}: ${f.text}`)).toEqual([
+      'allergy: Amlodis (amlodipin)',
+      'allergy: Avil',
+      'medication: Glifor (metformin)',
+    ]);
+  });
+
   it('hides a generic negative once a positive exists', () => {
     const out = combineLayers(
       [fact('allergy:__none__', 'Bilinen alerji yok', 1, { negated: true }), fact('allergy:lateks', 'Lateks', 2)],

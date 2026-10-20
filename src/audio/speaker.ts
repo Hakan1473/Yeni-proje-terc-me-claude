@@ -6,8 +6,11 @@
 
 type AudioContextCtor = typeof AudioContext;
 
-const JITTER_BUFFER_S = 0.06; // absorbs network jitter at the start of a reply
+const JITTER_BUFFER_S = 0.12; // fallback path only: cushion at the start of a reply
 const TAIL_S = 0.15; // room echo after playback before the microphone reopens
+const STREAM_IDLE_MS = 700; // no audio for this long: the reply is over even without turnComplete
+
+type LiveState = 'idle' | 'buffering' | 'playing';
 
 export type PlaybackSource = 'live' | 'clip';
 
@@ -20,6 +23,13 @@ export class Speaker {
   private playingSource: PlaybackSource | null = null;
   private watch: number | null = null;
   private levelData: Float32Array<ArrayBuffer> | null = null;
+  private player: AudioWorkletNode | null = null;
+  private playerLoad: Promise<void> | null = null;
+  private playerFailed = false;
+  private backlog: ArrayBuffer[] = [];
+  private liveState: LiveState = 'idle';
+  private liveEndedAt = 0;
+  private streamIdle: number | null = null;
   onPlayingChange: (playing: PlaybackSource | null) => void = () => {};
 
   /** Must be called from a user gesture: iOS only starts audio that way. */
@@ -66,7 +76,50 @@ export class Speaker {
   /** Is anything audible now (or within the echo tail)? The microphone stays closed meanwhile. */
   isPlaying(): boolean {
     if (!this.ctx) return false;
-    return this.sources.size > 0 || this.ctx.currentTime < this.nextTime + TAIL_S;
+    if (this.liveState !== 'idle' || this.sources.size > 0) return true;
+    const now = this.ctx.currentTime;
+    return now < this.nextTime + TAIL_S || now < this.liveEndedAt + TAIL_S;
+  }
+
+  /**
+   * The live voice plays from an AudioWorklet ring buffer: it keeps a small,
+   * adaptive cushion against network jitter and is immune to main-thread jank.
+   */
+  private ensurePlayer(): Promise<void> | null {
+    if (this.playerFailed) return null;
+    if (this.playerLoad) return this.playerLoad;
+    const ctx = this.context();
+    if (!ctx.audioWorklet) {
+      this.playerFailed = true;
+      return null;
+    }
+    this.playerLoad = ctx.audioWorklet
+      .addModule('/worklets/player.js')
+      .then(() => {
+        const node = new AudioWorkletNode(ctx, 'live-player', { numberOfInputs: 0, outputChannelCount: [1] });
+        node.port.onmessage = (e: MessageEvent<{ type: string; state: LiveState }>) => {
+          if (e.data.type === 'state') this.onLiveState(e.data.state);
+        };
+        node.connect(this.out ?? ctx.destination);
+        this.player = node;
+        for (const chunk of this.backlog.splice(0)) node.port.postMessage({ type: 'pcm', data: chunk }, [chunk]);
+      })
+      .catch(() => {
+        // Old browser or blocked module: fall back to scheduled buffers
+        this.playerFailed = true;
+        const pending = this.backlog.splice(0);
+        for (const chunk of pending) this.schedulePcm(chunk);
+      });
+    return this.playerLoad;
+  }
+
+  private onLiveState(state: LiveState) {
+    const was = this.liveState;
+    this.liveState = state;
+    if (state === 'idle' && was !== 'idle') {
+      this.liveEndedAt = this.ctx?.currentTime ?? 0;
+      if (this.playingSource === 'live' && this.sources.size === 0) this.watchEnd();
+    }
   }
 
   get current(): PlaybackSource | null {
@@ -86,9 +139,32 @@ export class Speaker {
   /** Append a chunk of 24 kHz PCM16 from the live interpreter. */
   playPcm(chunk: ArrayBuffer) {
     if (this.playingSource === 'clip') this.stop();
+    if (chunk.byteLength < 2) return;
+    const ctx = this.context();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    this.setPlaying('live');
+    if (this.ensurePlayer()) {
+      if (this.player) this.player.port.postMessage({ type: 'pcm', data: chunk }, [chunk]);
+      else this.backlog.push(chunk);
+      if (this.liveState === 'idle') this.liveState = 'buffering';
+      // A reply that simply stops (no turnComplete) must still release the microphone
+      if (this.streamIdle !== null) clearTimeout(this.streamIdle);
+      this.streamIdle = window.setTimeout(() => this.endLive(), STREAM_IDLE_MS);
+      return;
+    }
+    this.schedulePcm(chunk);
+  }
+
+  /** The model finished its reply: play out whatever is buffered without waiting for more. */
+  endLive() {
+    if (this.streamIdle !== null) clearTimeout(this.streamIdle);
+    this.streamIdle = null;
+    this.player?.port.postMessage({ type: 'end' });
+  }
+
+  private schedulePcm(chunk: ArrayBuffer) {
     const ctx = this.context();
     const pcm = new Int16Array(chunk);
-    if (pcm.length === 0) return;
     const buffer = ctx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
@@ -135,7 +211,7 @@ export class Speaker {
   private watchEnd() {
     if (this.watch !== null) return;
     const tick = () => {
-      if (!this.ctx || this.sources.size > 0 || this.ctx.currentTime < this.nextTime) {
+      if (!this.ctx || this.sources.size > 0 || this.liveState !== 'idle' || this.ctx.currentTime < this.nextTime) {
         this.watch = window.setTimeout(tick, 50);
         return;
       }
@@ -159,6 +235,11 @@ export class Speaker {
     }
     this.sources.clear();
     this.nextTime = this.ctx?.currentTime ?? 0;
+    this.backlog = [];
+    if (this.streamIdle !== null) clearTimeout(this.streamIdle);
+    this.streamIdle = null;
+    this.player?.port.postMessage({ type: 'clear' });
+    this.liveState = 'idle';
     if (this.watch !== null) {
       clearTimeout(this.watch);
       this.watch = null;

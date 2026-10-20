@@ -5,17 +5,17 @@ import { engine } from '../live/engine';
 
 /**
  * The interpreter's main control: a glass sphere filled with slowly drifting
- * pastel light. Voice makes the light swell and drops rings into it like rain
- * on water. Everything is drawn inside the circle; nothing spills outside.
+ * pastel light that swells and quickens with the voice. Everything is drawn
+ * inside the circle; nothing spills outside.
  */
 
-// Soft blue, lavender, rose, mint, peach
+// Muted pastels: powder blue, lilac, blush, sage mint, apricot
 const PALETTE: [number, number, number][] = [
-  [92, 160, 255],
-  [150, 130, 255],
-  [255, 128, 180],
-  [84, 214, 186],
-  [255, 182, 112],
+  [128, 172, 240],
+  [164, 150, 232],
+  [236, 156, 192],
+  [124, 202, 184],
+  [238, 190, 146],
 ];
 
 interface Blob {
@@ -26,13 +26,6 @@ interface Blob {
   orbit: number;
 }
 
-interface Ripple {
-  x: number;
-  y: number;
-  born: number;
-  strength: number;
-}
-
 const BLOBS: Blob[] = PALETTE.map((rgb, i) => ({
   rgb,
   phase: (i / PALETTE.length) * Math.PI * 2,
@@ -40,12 +33,6 @@ const BLOBS: Blob[] = PALETTE.map((rgb, i) => ({
   wy: 0.71 - i * 0.07,
   orbit: 0.38 + (i % 2) * 0.12,
 }));
-
-const RIPPLE_LIFE = 1.7;
-
-function easeOut(t: number) {
-  return 1 - (1 - t) ** 3;
-}
 
 function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: number) {
   useEffect(() => {
@@ -59,28 +46,14 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
 
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     const R = SIZE / 2;
-    const ripples: Ripple[] = [];
     let raf = 0;
     let last = performance.now();
     let clock = 0;
     let energy = 0;
-    let slow = 0;
-    let acc = 0;
-    let lastDrop = 0;
     let dark = document.documentElement.classList.contains('dark');
     let themeCheck = 0;
 
-    const drop = (now: number, strength: number) => {
-      // Drops land near the middle more often than at the rim
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.sqrt(Math.random()) * R * 0.5;
-      ripples.push({ x: R + Math.cos(a) * d, y: R + Math.sin(a) * d, born: now, strength });
-      if (ripples.length > 9) ripples.shift();
-      lastDrop = now;
-    };
-
     const frame = (nowMs: number) => {
-      const now = nowMs / 1000;
       const dt = Math.min(0.05, (nowMs - last) / 1000);
       last = nowMs;
       if (nowMs - themeCheck > 1000) {
@@ -95,19 +68,9 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
       const raw = !active || busy ? 0 : speaking ? engine.outLevel.get() : s.muted ? 0 : engine.micLevel.get();
       // Fast attack, slow release: the light swells with a syllable and settles gently
       energy += (raw - energy) * (raw > energy ? 0.45 : 0.07);
-      slow += (energy - slow) * 0.02;
 
       const speed = reduced.matches ? 0.08 : busy ? 1.4 : active ? 0.35 + energy * 1.8 : 0.22;
       clock += dt * speed;
-
-      if (!reduced.matches && active && !busy) {
-        acc += energy * dt * 4.2;
-        const onset = energy - slow > 0.16 && now - lastDrop > 0.14;
-        if (onset || (acc > 1 && energy > 0.06)) {
-          drop(now, Math.min(1, 0.35 + energy * 1.2));
-          acc = 0;
-        }
-      }
 
       ctx.clearRect(0, 0, SIZE, SIZE);
       ctx.save();
@@ -126,7 +89,7 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
       // Drifting light
       ctx.globalCompositeOperation = dark ? 'screen' : 'source-over';
       const swell = 1 + energy * 0.55;
-      const alpha = active ? 0.8 : 0.78;
+      const alpha = active ? 0.74 : 0.72;
       for (const b of BLOBS) {
         const x = R + Math.sin(clock * b.wx * 2.4 + b.phase) * R * b.orbit;
         const y = R + Math.cos(clock * b.wy * 2.4 + b.phase * 1.3) * R * b.orbit;
@@ -140,37 +103,7 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
         ctx.fillRect(0, 0, SIZE, SIZE);
       }
 
-      // Rings spreading from each drop, the second one trailing like on water
       ctx.globalCompositeOperation = 'source-over';
-      for (let i = ripples.length - 1; i >= 0; i--) {
-        const rp = ripples[i];
-        const age = (now - rp.born) / RIPPLE_LIFE;
-        if (age >= 1) {
-          ripples.splice(i, 1);
-          continue;
-        }
-        const fade = (1 - age) ** 1.6 * rp.strength;
-        if (age < 0.25) {
-          const splash = ctx.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, R * 0.28);
-          splash.addColorStop(0, `rgb(255 255 255 / ${0.45 * (1 - age / 0.25) * rp.strength})`);
-          splash.addColorStop(1, 'rgb(255 255 255 / 0)');
-          ctx.fillStyle = splash;
-          ctx.fillRect(0, 0, SIZE, SIZE);
-        }
-        for (const [lag, weight] of [
-          [0, 1],
-          [0.16, 0.55],
-        ] as const) {
-          const t = age - lag;
-          if (t <= 0) continue;
-          const radius = 1.5 + easeOut(t / (1 - lag)) * R * 1.25;
-          ctx.beginPath();
-          ctx.arc(rp.x, rp.y, radius, 0, Math.PI * 2);
-          ctx.lineWidth = 0.6 + (1 - t) * 2.2 * rp.strength;
-          ctx.strokeStyle = `rgb(255 255 255 / ${fade * weight * 0.6})`;
-          ctx.stroke();
-        }
-      }
       ctx.filter = 'none';
 
       // Glass: a soft top highlight and a gently darkened rim give the sphere depth
