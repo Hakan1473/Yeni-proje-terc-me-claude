@@ -46,55 +46,6 @@ export function Toast() {
   );
 }
 
-// ───────────────────────── Splash ─────────────────────────
-
-/** Brief launch moment; any tap skips it. */
-export function Splash({ onDone }: { onDone: () => void }) {
-  const [leaving, setLeaving] = useState(false);
-  const done = useRef(onDone);
-  done.current = onDone;
-  const finish = (delay: number) => {
-    setLeaving(true);
-    setTimeout(() => done.current(), delay);
-  };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
-  useEffect(() => {
-    const t = setTimeout(() => finish(450), 1100);
-    return () => clearTimeout(t);
-  }, []);
-  const names = LANGUAGES.slice(0, 24).map((l) => l.native);
-
-  return (
-    <button
-      type="button"
-      onClick={() => finish(250)}
-      aria-label="Uygulamaya geç"
-      className={`fixed inset-0 z-[70] flex items-center justify-center bg-bg cursor-pointer overflow-hidden transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-        leaving ? 'opacity-0 scale-[1.02] pointer-events-none' : ''
-      }`}
-    >
-      <div aria-hidden="true" className="absolute inset-0 flex flex-wrap content-center justify-center gap-x-8 gap-y-4 p-6 opacity-[0.06] [mask-image:radial-gradient(ellipse_70%_50%_at_center,transparent_45%,#000_100%)]">
-        {names.map((n) => (
-          <span key={n} className="text-[34px] font-semibold tracking-[-0.03em] whitespace-nowrap">
-            {n}
-          </span>
-        ))}
-      </div>
-      <div className="relative flex flex-col items-center text-center px-8 anim-pop">
-        <div className="relative">
-          <img src="/logo.png" alt="" className="relative w-[108px] h-[108px] rounded-[26px] bg-white shadow-[0_20px_50px_-12px_rgb(0_0_0/0.3)]" />
-        </div>
-        <h1 className="mt-7 text-[30px] font-semibold tracking-[-0.03em]">Canlı Sesli Tercüman</h1>
-        <p className="mt-2 text-[16px] text-label-2">Sağlık personeli ve hasta için iki yönlü iletişim.</p>
-        <span className="mt-7 w-24 h-[3px] rounded-full bg-fill overflow-hidden">
-          <span className="block w-full h-full bg-accent anim-progress" />
-        </span>
-        <p className="mt-7 text-[12px] text-label-3">{LANGUAGES.length} dilde anlık tercüme · Hakan Karaarslan tarafından oluşturulmuştur</p>
-      </div>
-    </button>
-  );
-}
-
 // ───────────────────────── Typed message ─────────────────────────
 
 export function TypeSheet({ onClose }: { onClose: () => void }) {

@@ -34,7 +34,8 @@ const BLOBS: Blob[] = PALETTE.map((rgb, i) => ({
   orbit: 0.38 + (i % 2) * 0.12,
 }));
 
-function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: number) {
+/** `drive`, when given, replaces the interpreter's audio level (used by the launch screen). */
+export function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: number, drive?: { current: number }) {
   useEffect(() => {
     const el = canvas.current;
     const ctx = el?.getContext('2d');
@@ -62,10 +63,11 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
       }
 
       const s = engine.store.get();
-      const active = s.session !== 'idle';
-      const busy = s.session === 'connecting' || s.session === 'reconnecting';
-      const speaking = s.session === 'speaking';
-      const raw = !active || busy ? 0 : speaking ? engine.outLevel.get() : s.muted ? 0 : engine.micLevel.get();
+      const active = drive ? true : s.session !== 'idle';
+      const busy = !drive && (s.session === 'connecting' || s.session === 'reconnecting');
+      const speaking = !drive && s.session === 'speaking';
+      const muted = !drive && s.muted;
+      const raw = drive ? drive.current : !active || busy ? 0 : speaking ? engine.outLevel.get() : muted ? 0 : engine.micLevel.get();
       // Fast attack, slow release: the light swells with a syllable and settles gently
       energy += (raw - energy) * (raw > energy ? 0.45 : 0.07);
 
@@ -77,7 +79,7 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
       ctx.beginPath();
       ctx.arc(R, R, R, 0, Math.PI * 2);
       ctx.clip();
-      if (s.muted && !speaking) ctx.filter = 'grayscale(1)';
+      if (muted && !speaking) ctx.filter = 'grayscale(1)';
 
       // Base: a pale pearl in light mode, deep ink in dark mode
       const base = ctx.createRadialGradient(R, R * 0.8, 0, R, R, R);
@@ -129,7 +131,7 @@ function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, SIZE: n
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [canvas, SIZE]);
+  }, [canvas, SIZE, drive]);
 }
 
 /** Non-interactive sphere, for illustrations such as onboarding. */
