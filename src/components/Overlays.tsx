@@ -1,4 +1,4 @@
-import { ArrowsClockwise, CaretLeft, FilmStrip, Microphone, MicrophoneSlash, PlayCircle } from '@phosphor-icons/react';
+import { ArrowsClockwise, CaretLeft } from '@phosphor-icons/react';
 import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { LANGUAGES } from '../../shared/languages';
@@ -142,10 +142,8 @@ export function TypeSheet({ onClose }: { onClose: () => void }) {
 export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => void; initialVideo?: TutorialKind | null }) {
   const items = useStore(engine.store, (s) => s.items);
   const language = useStore(engine.store, (s) => s.language);
-  const muted = useStore(engine.store, (s) => s.muted);
   const [flipped, setFlipped] = useState(true);
   const [video, setVideo] = useState<TutorialKind | null>(initialVideo);
-  const [picker, setPicker] = useState(false);
   const last = [...items].reverse().find((i): i is Turn => i.kind === 'turn' && !!(i.source || i.translation));
 
   // The patient half always shows the patient's language, the staff half Turkish
@@ -162,14 +160,10 @@ export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => vo
   }, [lastTutorial, last?.tutorial]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (picker) setPicker(false);
-      else onClose();
-    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, picker]);
+  }, [onClose]);
 
   const half = (text: string | undefined, label: ReactNode, placeholder: string, tone: string) => (
     <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-12 py-6">
@@ -224,45 +218,11 @@ export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => vo
 
       <div className="relative shrink-0 flex items-center justify-center px-4 py-2">
         <span className="absolute inset-x-0 top-1/2 h-px bg-separator" aria-hidden="true" />
-        {picker && (
-          <div className="video-picker glass anim-pop" role="menu" aria-label="Eğitim videoları">
-            {(Object.keys(TUTORIAL_VIDEOS) as TutorialKind[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="menuitemradio"
-                aria-checked={video === k}
-                onClick={() => {
-                  setVideo(k);
-                  setPicker(false);
-                }}
-                className="video-picker-item pressable cursor-pointer"
-              >
-                <span className="video-picker-thumb">
-                  <video muted playsInline preload="metadata" className="w-full h-full object-cover pointer-events-none">
-                    <VideoSources kind={k} />
-                  </video>
-                  <PlayCircle size={26} weight="fill" className="absolute text-white drop-shadow" />
-                </span>
-                <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug">{TUTORIAL_VIDEOS[k].title}</span>
-                {video === k && <Check className="w-5 h-5 text-accent shrink-0" strokeWidth={2.5} />}
-              </button>
-            ))}
-          </div>
-        )}
         <nav aria-label="Karşılıklı görünüm kontrolleri" className="dock relative">
           <DockKey icon={CaretLeft} label="Kapat" onClick={onClose} />
-          <DockKey icon={FilmStrip} label="Videolar" tone={video || picker ? 'accent' : undefined} pressed={picker} onClick={() => setPicker((p) => !p)} />
           <span className="dock-orb">
             <Orb size={64} />
           </span>
-          <DockKey
-            icon={muted ? MicrophoneSlash : Microphone}
-            label={muted ? 'Sessizde' : 'Sessiz'}
-            tone={muted ? 'danger' : undefined}
-            pressed={muted}
-            onClick={() => engine.setMuted(!muted)}
-          />
           <DockKey icon={ArrowsClockwise} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
         </nav>
       </div>
