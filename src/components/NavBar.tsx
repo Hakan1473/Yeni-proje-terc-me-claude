@@ -13,7 +13,7 @@ export function NavBar({ onLanguages, onHistory, onSettings }: { onLanguages: ()
   const hasItems = useStore(engine.store, (s) => s.items.length > 0);
 
   return (
-    <header className="relative z-20 pt-safe shrink-0 select-none px-3 sm:px-5 pt-2">
+    <header className="relative z-20 pt-safe-nav shrink-0 select-none px-3 sm:px-5">
       <div className="glass h-[58px] rounded-[29px] flex items-center gap-2 pl-2.5 pr-2.5 sm:pl-3 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-2 min-w-0 sm:w-[220px]">
           <button type="button" onClick={onHistory} aria-label="Geçmiş konuşmalar" title="Geçmiş konuşmalar" className="pressable icon-btn !w-10 !h-10 cursor-pointer sm:hidden">

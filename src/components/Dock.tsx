@@ -59,7 +59,7 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
   const hasTurns = useStore(engine.store, (s) => s.items.some((i) => i.kind === 'turn'));
 
   return (
-    <footer className="relative z-20 shrink-0 select-none pb-safe">
+    <footer className="relative z-20 shrink-0 select-none pb-safe-tight">
       <div className="flex flex-col items-center px-3 pt-1">
         <Status />
         <nav aria-label="Tercüman kontrolleri" className="dock">
@@ -77,7 +77,7 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
           <DockKey icon={ChatsCircle} label="Hastaya" onClick={onFaceToFace} />
           <DockKey icon={ClipboardText} label="Özet" onClick={onSummary} disabled={!hasTurns} />
         </nav>
-        <p className="pt-1.5 pb-1 text-center text-[10.5px] text-label-3">
+        <p className="pt-1 text-center text-[10.5px] leading-[14px] text-label-3">
           <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur
         </p>
       </div>
