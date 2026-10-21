@@ -1,15 +1,18 @@
-import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, MicOff, RotateCw, Send, WifiOff, X } from 'lucide-react';
+import { ArrowsClockwise, CaretLeft, FilmStrip, Microphone, MicrophoneSlash, PlayCircle } from '@phosphor-icons/react';
+import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { LANGUAGES } from '../../shared/languages';
-import type { Turn } from '../../shared/types';
+import { TUTORIAL_VIDEOS } from '../../shared/tutorials';
+import type { TutorialKind, Turn } from '../../shared/types';
 import { checkAccess } from '../lib/api';
 import { patientHint } from '../lib/patientHints';
 import { setAccessCode } from '../lib/settings';
 import { useStore } from '../lib/store';
 import { engine } from '../live/engine';
-import { Flag, Sheet } from './ui';
+import { VideoSources } from './Conversation';
 import { DockKey } from './Dock';
 import { Orb, OrbArt } from './Orb';
+import { Flag, Sheet } from './ui';
 
 // ───────────────────────── Toast ─────────────────────────
 
@@ -136,21 +139,37 @@ export function TypeSheet({ onClose }: { onClose: () => void }) {
  * Two halves facing each other across the bed, like Apple Translate's
  * face-to-face mode: the top half is turned towards the patient.
  */
-export function FaceToFace({ onClose }: { onClose: () => void }) {
+export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => void; initialVideo?: TutorialKind | null }) {
   const items = useStore(engine.store, (s) => s.items);
   const language = useStore(engine.store, (s) => s.language);
+  const muted = useStore(engine.store, (s) => s.muted);
   const [flipped, setFlipped] = useState(true);
+  const [video, setVideo] = useState<TutorialKind | null>(initialVideo);
+  const [picker, setPicker] = useState(false);
   const last = [...items].reverse().find((i): i is Turn => i.kind === 'turn' && !!(i.source || i.translation));
 
   // The patient half always shows the patient's language, the staff half Turkish
   const patientText = last ? (last.speaker === 'nurse' ? last.translation : last.source) : undefined;
   const staffText = last ? (last.speaker === 'nurse' ? last.source : last.translation) : undefined;
 
+  // Teaching that starts while this screen is open brings its video up for the patient
+  const lastTutorial = last?.tutorial && last.status === 'done' ? `${last.id}:${last.tutorial}` : null;
+  const seen = useRef(lastTutorial);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    if (!lastTutorial || lastTutorial === seen.current) return;
+    seen.current = lastTutorial;
+    setVideo(last?.tutorial ?? null);
+  }, [lastTutorial, last?.tutorial]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (picker) setPicker(false);
+      else onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, picker]);
 
   const half = (text: string | undefined, label: ReactNode, placeholder: string, tone: string) => (
     <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-12 py-6">
@@ -169,27 +188,82 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
     </div>
   );
 
+  const patientLabel = (
+    <>
+      <Flag iso={language.flag} label={language.nameTr} size="xs" />
+      <span dir="auto">{language.native}</span>
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 bg-bg flex flex-col pt-safe pb-safe anim-fade" role="dialog" aria-modal="true" aria-label="Hastaya göster">
+    <div className="fixed inset-0 z-50 isolate flex flex-col pt-safe pb-safe anim-fade" role="dialog" aria-modal="true" aria-label="Hastaya göster">
+      <div className="ambient" aria-hidden="true" />
       <div className={`flex-1 min-h-0 flex flex-col ${flipped ? 'rotate-180' : ''} transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]`}>
-        {half(
-          patientText,
-          <>
-            <Flag iso={language.flag} label={language.nameTr} size="xs" />
-            <span dir="auto">{language.native}</span>
-          </>,
-          patientHint(language.code),
-          'text-patient',
+        {video ? (
+          <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-10 py-4 gap-3 anim-fade">
+            <div className="text-[13px] font-semibold text-label-2 flex items-center gap-2">{patientLabel}</div>
+            <figure key={video} className="video-stage flex-1 min-h-0">
+              <video autoPlay muted loop playsInline disablePictureInPicture className="w-full h-full object-contain pointer-events-none">
+                <VideoSources kind={video} />
+              </video>
+              <figcaption className="video-caption">
+                <span className="min-w-0">
+                  <span className="block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/70">Eğitim videosu</span>
+                  <span className="block text-[17px] font-semibold text-white leading-snug truncate">{TUTORIAL_VIDEOS[video].title}</span>
+                </span>
+                <button type="button" onClick={() => setVideo(null)} aria-label="Videoyu kapat" className="video-close pressable cursor-pointer">
+                  <X className="w-5 h-5" strokeWidth={2.5} />
+                </button>
+              </figcaption>
+            </figure>
+          </div>
+        ) : (
+          half(patientText, patientLabel, patientHint(language.code), 'text-patient')
         )}
       </div>
+
       <div className="relative shrink-0 flex items-center justify-center px-4 py-2">
         <span className="absolute inset-x-0 top-1/2 h-px bg-separator" aria-hidden="true" />
+        {picker && (
+          <div className="video-picker glass anim-pop" role="menu" aria-label="Eğitim videoları">
+            {(Object.keys(TUTORIAL_VIDEOS) as TutorialKind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="menuitemradio"
+                aria-checked={video === k}
+                onClick={() => {
+                  setVideo(k);
+                  setPicker(false);
+                }}
+                className="video-picker-item pressable cursor-pointer"
+              >
+                <span className="video-picker-thumb">
+                  <video muted playsInline preload="metadata" className="w-full h-full object-cover pointer-events-none">
+                    <VideoSources kind={k} />
+                  </video>
+                  <PlayCircle size={26} weight="fill" className="absolute text-white drop-shadow" />
+                </span>
+                <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug">{TUTORIAL_VIDEOS[k].title}</span>
+                {video === k && <Check className="w-5 h-5 text-accent shrink-0" strokeWidth={2.5} />}
+              </button>
+            ))}
+          </div>
+        )}
         <nav aria-label="Karşılıklı görünüm kontrolleri" className="dock relative">
-          <DockKey icon={ChevronLeft} label="Kapat" onClick={onClose} />
+          <DockKey icon={CaretLeft} label="Kapat" onClick={onClose} />
+          <DockKey icon={FilmStrip} label="Videolar" tone={video || picker ? 'accent' : undefined} pressed={picker} onClick={() => setPicker((p) => !p)} />
           <span className="dock-orb">
             <Orb size={64} />
           </span>
-          <DockKey icon={RotateCw} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
+          <DockKey
+            icon={muted ? MicrophoneSlash : Microphone}
+            label={muted ? 'Sessizde' : 'Sessiz'}
+            tone={muted ? 'danger' : undefined}
+            pressed={muted}
+            onClick={() => engine.setMuted(!muted)}
+          />
+          <DockKey icon={ArrowsClockwise} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
         </nav>
       </div>
       {half(
@@ -198,7 +272,9 @@ export function FaceToFace({ onClose }: { onClose: () => void }) {
           <Flag iso="tr" label="Türkçe" size="xs" />
           Türkçe · Personel
         </>,
-        'Konuştuğunuzda çeviri burada büyük yazıyla görünür. Üst yarı hastaya döner ve ona aynı açıklamayı kendi dilinde gösterir.',
+        video
+          ? 'Üst yarıda hastaya eğitim videosu oynatılıyor. Videoyu kapatınca çeviriler yeniden görünür.'
+          : 'Konuştuğunuzda çeviri burada büyük yazıyla görünür. Üst yarı hastaya döner ve ona aynı açıklamayı kendi dilinde gösterir.',
         'text-label',
       )}
     </div>

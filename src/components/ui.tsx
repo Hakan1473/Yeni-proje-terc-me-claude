@@ -49,7 +49,7 @@ export function Segmented<T extends string>({
       <span
         aria-hidden="true"
         className="segmented-thumb"
-        style={{ width: `calc((100% - 4px) / ${items.length})`, transform: `translateX(${index * 100}%)` }}
+        style={{ width: `calc((100% - 6px) / ${items.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {items.map((item) => (
         <button key={item.id} type="button" role="tab" aria-selected={item.id === value} onClick={() => onChange(item.id)} className="segmented-item">
@@ -112,12 +112,12 @@ export function Sheet({
   // Portalled so a sheet opened from inside a transformed pane still covers the screen
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6" style={overlayStyle} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <button type="button" tabIndex={-1} aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-black/30 dark:bg-black/60 anim-fade cursor-default" />
+      <button type="button" tabIndex={-1} aria-hidden="true" onClick={onClose} className="scrim absolute inset-0 anim-fade cursor-default" />
       <div
         ref={panel}
         tabIndex={-1}
         style={panelStyle}
-        className={`sheet relative w-full ${width} flex flex-col overflow-hidden rounded-t-[22px] sm:rounded-[24px] shadow-float pb-safe sm:pb-0 outline-none ${
+        className={`sheet relative w-full ${width} flex flex-col overflow-hidden rounded-t-[28px] sm:rounded-[30px] shadow-float pb-safe sm:pb-0 outline-none ${
           tall ? 'h-[94dvh] sm:h-[84vh] sm:max-h-[860px]' : 'max-h-[94dvh] sm:max-h-[86vh]'
         }`}
       >

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.30.0",
+    "@phosphor-icons/react": "2.1.10",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.2",
     "dotenv": "^17.2.3",

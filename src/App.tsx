@@ -13,6 +13,7 @@ import { Segmented } from './components/ui';
 import * as api from './lib/api';
 import { applyRetention } from './lib/history';
 import { applyTheme, getAccessCode, loadSettings, saveSettings, type Theme } from './lib/settings';
+import type { TutorialKind } from '../shared/types';
 import { useStore } from './lib/store';
 import { engine } from './live/engine';
 
@@ -49,6 +50,7 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(() => loadSettings().theme);
   const [sheet, setSheet] = useState<SheetName | null>(null);
   const [pane, setPane] = useState<Pane>('dialogue');
+  const [faceVideo, setFaceVideo] = useState<TutorialKind | null>(null);
   const wide = useMediaQuery(WIDE);
   const language = useStore(engine.store, (s) => s.language);
   const turnCount = useStore(engine.store, (s) => s.items.filter((i) => i.kind === 'turn').length);
@@ -92,6 +94,12 @@ export default function App() {
     setSheet('summary');
   };
 
+  // A tutorial video shown full size to the patient, on the face-to-face screen
+  const presentVideo = useCallback((kind: TutorialKind) => {
+    setFaceVideo(kind);
+    setSheet('face');
+  }, []);
+
   const onTouchStart = (e: TouchEvent) => {
     touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
@@ -104,7 +112,8 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col overflow-hidden bg-bg text-label">
+    <div className="relative isolate h-[100dvh] w-full flex flex-col overflow-hidden text-label">
+      <div className="ambient" aria-hidden="true" />
       <NavBar onLanguages={() => setSheet('languages')} onHistory={() => setSheet('history')} onSettings={() => setSheet('settings')} />
       <LanguageRail onAll={() => setSheet('languages')} />
 
@@ -160,9 +169,9 @@ export default function App() {
               </div>
               <div className="flex-1 min-h-0 grid grid-cols-2">
                 <div className="min-h-0">
-                  <Conversation onSummary={openSummary} />
+                  <Conversation onPresentVideo={presentVideo} />
                 </div>
-                <div className="min-h-0 hairline-l bg-surface-2/50 dark:bg-black/20">
+                <div className="min-h-0 hairline-l">
                   <AnamnesisPanel />
                 </div>
               </div>
@@ -174,7 +183,7 @@ export default function App() {
                 style={{ transform: pane === 'dialogue' ? 'translateX(0)' : 'translateX(-50%)' }}
               >
                 <div className="w-1/2 h-full min-h-0" aria-hidden={pane !== 'dialogue'} inert={pane !== 'dialogue'}>
-                  <Conversation onSummary={openSummary} />
+                  <Conversation onPresentVideo={presentVideo} />
                 </div>
                 <div className="w-1/2 h-full min-h-0" aria-hidden={pane !== 'anamnesis'} inert={pane !== 'anamnesis'}>
                   <AnamnesisPanel />
@@ -194,7 +203,15 @@ export default function App() {
       {sheet === 'history' && <HistorySheet onClose={closeSheet} />}
       {sheet === 'summary' && <SummarySheet onClose={closeSheet} />}
       {sheet === 'type' && <TypeSheet onClose={closeSheet} />}
-      {sheet === 'face' && <FaceToFace onClose={closeSheet} />}
+      {sheet === 'face' && (
+        <FaceToFace
+          initialVideo={faceVideo}
+          onClose={() => {
+            setFaceVideo(null);
+            closeSheet();
+          }}
+        />
+      )}
       {sheet === 'guide' && (
         <Onboarding
           onClose={() => {

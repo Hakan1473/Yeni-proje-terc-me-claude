@@ -28,7 +28,7 @@ export const DEMO_SCRIPT: ScriptTurn[] = [
   { speaker: 'patient', said: 'I have high blood pressure and type 2 diabetes.', heard: 'Yüksek tansiyonum ve tip 2 diyabetim var.' },
   { speaker: 'nurse', said: 'Ağrınızı 1 ile 10 arasında puanlar mısınız?', heard: 'Could you rate your pain from 1 to 10?' },
   { speaker: 'patient', said: 'About seven.', heard: 'Yaklaşık yedi.' },
-  { speaker: 'nurse', said: 'Şimdi size 500 mg Parol vereceğim ve damar yolu açacağım.', heard: 'I will now give you 50 mg of Parol, which is paracetamol, and insert an IV line.' },
+  { speaker: 'nurse', said: 'Şimdi size 500 mg Parol vereceğim ve damar yolu açacağım.', heard: 'I will now give you 50 mg of Parol and insert an IV line.' },
   { speaker: 'nurse', said: 'Bir şeye ihtiyacınız olursa lütfen yatağınızın yanındaki çağrı butonuna basın.', heard: 'If you need anything, please press the call button next to your bed.' },
   { speaker: 'patient', said: 'Could I have some water, please?', heard: 'Biraz su alabilir miyim lütfen?' },
   { speaker: 'nurse', said: 'Ameliyattan sonra Triflow cihazını saatte bir kez, 10 defa derin nefes çekerek kullanacaksınız.', heard: 'After the surgery, you will use the Triflow device once every hour, breathing in deeply 10 times.' },

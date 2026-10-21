@@ -1,4 +1,4 @@
-import { FileText, Keyboard, type LucideIcon, Mic, MicOff, ScanText } from 'lucide-react';
+import { ChatsCircle, ClipboardText, type Icon as PhosphorIcon, Keyboard, Microphone, MicrophoneSlash } from '@phosphor-icons/react';
 import { useStore } from '../lib/store';
 import { engine, type SessionState } from '../live/engine';
 import { Orb } from './Orb';
@@ -13,7 +13,7 @@ const CAPTION: Record<SessionState, { title: string; tone: string }> = {
   speaking: { title: 'Seslendiriliyor · Geçmek için küreye dokunun', tone: 'var(--accent)' },
 };
 
-/** A key in the dock: glyph over a short label, tinted when it is switched on. */
+/** A key in the dock: a glass button with a filled glyph over a short label. */
 export function DockKey({
   icon: Icon,
   label,
@@ -22,7 +22,7 @@ export function DockKey({
   disabled,
   pressed,
 }: {
-  icon: LucideIcon;
+  icon: PhosphorIcon;
   label: string;
   onClick: () => void;
   tone?: 'danger' | 'accent';
@@ -30,16 +30,9 @@ export function DockKey({
   pressed?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={pressed}
-      data-tone={tone}
-      className="dock-key group cursor-pointer disabled:cursor-default"
-    >
+    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} className="dock-key cursor-pointer disabled:cursor-default">
       <span className="dock-key-face">
-        <Icon className="w-[21px] h-[21px]" strokeWidth={1.9} />
+        <Icon size={22} weight={tone ? 'fill' : 'duotone'} />
       </span>
       <span className="dock-key-label">{label}</span>
     </button>
@@ -72,7 +65,7 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
         <nav aria-label="Tercüman kontrolleri" className="dock">
           <DockKey icon={Keyboard} label="Yaz" onClick={onType} />
           <DockKey
-            icon={muted ? MicOff : Mic}
+            icon={muted ? MicrophoneSlash : Microphone}
             label={muted ? 'Sessizde' : 'Sessiz'}
             tone={muted ? 'danger' : undefined}
             pressed={muted}
@@ -81,8 +74,8 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
           <span className="dock-orb">
             <Orb size={72} />
           </span>
-          <DockKey icon={ScanText} label="Hastaya" onClick={onFaceToFace} />
-          <DockKey icon={FileText} label="Özet" onClick={onSummary} disabled={!hasTurns} />
+          <DockKey icon={ChatsCircle} label="Hastaya" onClick={onFaceToFace} />
+          <DockKey icon={ClipboardText} label="Özet" onClick={onSummary} disabled={!hasTurns} />
         </nav>
         <p className="pt-1.5 pb-1 text-center text-[10.5px] text-label-3">
           <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur

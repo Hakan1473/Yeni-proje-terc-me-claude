@@ -8,7 +8,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
-  Sparkles,
+  ScanText,
   Square,
   TriangleAlert,
   Volume2,
@@ -66,44 +66,75 @@ export function VideoSources({ kind }: { kind: TutorialKind }) {
   );
 }
 
-/** Muted reference video under a teaching sentence. Plays three times, then folds away. */
-function VideoCard({ kind }: { kind: TutorialKind }) {
+const PLAYS = 3;
+
+/**
+ * Teaching video under the sentence that triggered it: a glass media card that
+ * plays muted three times, then folds into a compact row. "Hastaya göster"
+ * opens it full size on the patient-facing screen.
+ */
+function VideoCard({ kind, onPresent }: { kind: TutorialKind; onPresent?: (kind: TutorialKind) => void }) {
   const video = TUTORIAL_VIDEOS[kind];
   const [plays, setPlays] = useState(0);
+  const [progress, setProgress] = useState(0);
   const ref = useRef<HTMLVideoElement>(null);
-  const done = plays >= 3;
+  const done = plays >= PLAYS;
+
+  const present = onPresent && (
+    <button type="button" onClick={() => onPresent(kind)} aria-label="Hastaya göster" className="video-action pressable cursor-pointer">
+      <ScanText className="w-4 h-4" strokeWidth={2.25} />
+      <span className="hidden sm:inline">Hastaya göster</span>
+    </button>
+  );
 
   if (done) {
     return (
-      <div className="mt-3 rounded-[14px] bg-surface/70 dark:bg-surface-2 p-2.5 pl-3 flex items-center gap-3 anim-fade">
-        <span className="glyph w-8 h-8 rounded-[9px] bg-accent">
-          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+      <div className="video-row mt-3 anim-fade">
+        <span className="video-row-thumb">
+          <Play className="w-4 h-4 fill-current ml-0.5" />
         </span>
-        <p className="flex-1 min-w-0 text-[14px] font-medium leading-snug">{video.title}</p>
-        <button type="button" onClick={() => setPlays(0)} className="pressable btn-tinted h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-[13px] font-medium cursor-pointer">
-          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.25} />
-          Tekrar göster
+        <span className="flex-1 min-w-0">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-label-2">Eğitim videosu</span>
+          <span className="block text-[14px] font-semibold leading-snug truncate">{video.title}</span>
+        </span>
+        <button type="button" onClick={() => setPlays(0)} aria-label="Tekrar oynat" title="Tekrar oynat" className="pressable icon-btn !w-9 !h-9 cursor-pointer">
+          <RotateCcw className="w-4 h-4" strokeWidth={2.25} />
         </button>
+        {onPresent && (
+          <button type="button" onClick={() => onPresent(kind)} aria-label="Hastaya göster" title="Hastaya göster" className="pressable icon-btn !w-9 !h-9 cursor-pointer text-accent">
+            <ScanText className="w-4 h-4" strokeWidth={2.25} />
+          </button>
+        )}
       </div>
     );
   }
   return (
-    <figure className="mt-3 overflow-hidden rounded-[14px] bg-black anim-rise">
+    <figure className="video-card mt-3 anim-rise">
       <video
         ref={ref}
         autoPlay
         muted
         playsInline
         disablePictureInPicture
+        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime / (e.currentTarget.duration || 1))}
         onEnded={() => {
           setPlays((p) => p + 1);
-          if (plays < 2) void ref.current?.play().catch(() => {});
+          if (plays < PLAYS - 1) void ref.current?.play().catch(() => {});
         }}
-        className="w-full max-h-[340px] object-contain block pointer-events-none"
+        className="w-full max-h-[360px] aspect-video object-cover block pointer-events-none"
       >
         <VideoSources kind={kind} />
       </video>
-      <figcaption className="px-3 py-2 text-[12px] font-medium text-white/80 bg-black">{video.title}</figcaption>
+      <figcaption className="video-caption">
+        <span className="min-w-0">
+          <span className="block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/70">Eğitim videosu · {plays + 1}/{PLAYS}</span>
+          <span className="block text-[15px] font-semibold text-white leading-snug truncate">{video.title}</span>
+        </span>
+        {present}
+      </figcaption>
+      <span className="video-progress" aria-hidden="true">
+        <span style={{ transform: `scaleX(${(plays + progress) / PLAYS})` }} />
+      </span>
     </figure>
   );
 }
@@ -127,11 +158,13 @@ const TurnCard = memo(function TurnCard({
   language,
   playing,
   translating,
+  onPresentVideo,
 }: {
   turn: Turn;
   language: Language;
   playing: boolean;
   translating: boolean;
+  onPresentVideo?: (kind: TutorialKind) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const nurse = turn.speaker === 'nurse';
@@ -148,7 +181,7 @@ const TurnCard = memo(function TurnCard({
   return (
     <article
       className={`anim-rise w-fit min-w-[min(100%,260px)] max-w-[92%] sm:max-w-[84%] rounded-[22px] px-4 pt-3 pb-3.5 ${
-        nurse ? 'ml-auto bg-surface shadow-card rounded-br-[8px]' : 'mr-auto bg-patient-soft rounded-bl-[8px]'
+        nurse ? 'ml-auto bg-surface shadow-card rounded-br-[8px]' : 'mr-auto bg-patient-soft shadow-card rounded-bl-[8px]'
       }`}
     >
       <header className="flex items-center gap-2 min-h-[30px]">
@@ -228,7 +261,7 @@ const TurnCard = memo(function TurnCard({
         </div>
       )}
 
-      {turn.tutorial && <VideoCard kind={turn.tutorial} />}
+      {turn.tutorial && <VideoCard kind={turn.tutorial} onPresent={onPresentVideo} />}
     </article>
   );
 });
@@ -263,7 +296,7 @@ function EmptyState() {
   );
 }
 
-export function Conversation({ onSummary }: { onSummary: () => void }) {
+export function Conversation({ onPresentVideo }: { onPresentVideo?: (kind: TutorialKind) => void }) {
   const items = useStore(engine.store, (s) => s.items);
   const language = useStore(engine.store, (s) => s.language);
   const playingTurnId = useStore(engine.store, (s) => s.playingTurnId);
@@ -271,7 +304,6 @@ export function Conversation({ onSummary }: { onSummary: () => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const [showJump, setShowJump] = useState(false);
-  const hasTurns = items.some((i) => i.kind === 'turn');
 
   // Follow new content only while the reader is at the bottom
   useLayoutEffect(() => {
@@ -309,16 +341,8 @@ export function Conversation({ onSummary }: { onSummary: () => void }) {
           item.kind === 'note' ? (
             <NoteRow key={item.id} text={item.text} at={item.createdAt} />
           ) : (
-            <TurnCard key={item.id} turn={item} language={language} playing={playingTurnId === item.id} translating={translatingTurnId === item.id} />
+            <TurnCard key={item.id} turn={item} language={language} playing={playingTurnId === item.id} translating={translatingTurnId === item.id} onPresentVideo={onPresentVideo} />
           ),
-        )}
-        {hasTurns && (
-          <div className="flex justify-center pt-1 pb-2">
-            <button type="button" onClick={onSummary} className="pressable btn-tinted h-9 pl-3 pr-4 rounded-full inline-flex items-center gap-1.5 text-[14px] font-medium cursor-pointer">
-              <Sparkles className="w-4 h-4" strokeWidth={2.25} />
-              Konuşma Özeti Oluştur
-            </button>
-          </div>
         )}
       </div>
       {showJump && (
