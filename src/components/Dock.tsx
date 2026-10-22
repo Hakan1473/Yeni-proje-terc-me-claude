@@ -1,4 +1,4 @@
-import { ChatsCircle, ClipboardText, type Icon as PhosphorIcon, Keyboard, Microphone, MicrophoneSlash } from '@phosphor-icons/react';
+import { ClinicalNotes, type DockIcon, Forum, Keyboard, Mic, MicOff } from './icons';
 import { useStore } from '../lib/store';
 import { engine, type SessionState } from '../live/engine';
 import { Orb } from './Orb';
@@ -13,7 +13,7 @@ const CAPTION: Record<SessionState, { title: string; tone: string }> = {
   speaking: { title: 'Seslendiriliyor · Durdurmak için küreye dokunun', tone: 'var(--accent)' },
 };
 
-/** A key in the dock: a glass button with a filled glyph over a short label. */
+/** A key in the dock: a glass button with a filled Material Symbols glyph over a short label. */
 export function DockKey({
   icon: Icon,
   label,
@@ -21,20 +21,18 @@ export function DockKey({
   tone,
   disabled,
   pressed,
-  weight,
 }: {
-  icon: PhosphorIcon;
+  icon: DockIcon;
   label: string;
   onClick: () => void;
   tone?: 'danger' | 'accent';
   disabled?: boolean;
   pressed?: boolean;
-  weight?: 'bold' | 'duotone' | 'fill';
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} className="dock-key cursor-pointer disabled:cursor-default">
       <span className="dock-key-face">
-        <Icon size={22} weight={weight ?? (tone ? 'fill' : 'duotone')} />
+        <Icon size={24} />
       </span>
       <span className="dock-key-label">{label}</span>
     </button>
@@ -67,7 +65,7 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
         <nav aria-label="Tercüman kontrolleri" className="dock">
           <DockKey icon={Keyboard} label="Yaz" onClick={onType} />
           <DockKey
-            icon={muted ? MicrophoneSlash : Microphone}
+            icon={muted ? MicOff : Mic}
             label={muted ? 'Sessizde' : 'Sessiz'}
             tone={muted ? 'danger' : undefined}
             pressed={muted}
@@ -76,8 +74,8 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
           <span className="dock-orb">
             <Orb size={72} />
           </span>
-          <DockKey icon={ChatsCircle} label="Hastaya" onClick={onFaceToFace} />
-          <DockKey icon={ClipboardText} label="Özet" onClick={onSummary} disabled={!hasTurns} />
+          <DockKey icon={Forum} label="Hastaya" onClick={onFaceToFace} />
+          <DockKey icon={ClinicalNotes} label="Özet" onClick={onSummary} disabled={!hasTurns} />
         </nav>
         <p className="pt-1 text-center text-[10.5px] leading-[14px] text-label-3">
           <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur

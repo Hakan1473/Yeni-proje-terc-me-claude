@@ -1,4 +1,3 @@
-import { ArrowsClockwise, ArrowUUpLeft } from '@phosphor-icons/react';
 import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { LANGUAGES } from '../../shared/languages';
@@ -11,6 +10,7 @@ import { useStore } from '../lib/store';
 import { engine } from '../live/engine';
 import { VideoSources } from './Conversation';
 import { DockKey } from './Dock';
+import { Sync, Undo } from './icons';
 import { Orb, OrbArt } from './Orb';
 import { Flag, Sheet } from './ui';
 
@@ -170,11 +170,11 @@ export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => vo
       <div className="relative shrink-0 flex items-center justify-center px-4 py-2">
         <span className="absolute inset-x-0 top-1/2 h-px bg-separator" aria-hidden="true" />
         <nav aria-label="Karşılıklı görünüm kontrolleri" className="dock relative">
-          <DockKey icon={ArrowUUpLeft} weight="bold" label="Geri dön" onClick={onClose} />
+          <DockKey icon={Undo} label="Geri dön" onClick={onClose} />
           <span className="dock-orb">
             <Orb size={64} />
           </span>
-          <DockKey icon={ArrowsClockwise} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
+          <DockKey icon={Sync} label="Çevir" tone={flipped ? 'accent' : undefined} pressed={flipped} onClick={() => setFlipped((f) => !f)} />
         </nav>
       </div>
       {half(
