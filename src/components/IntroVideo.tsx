@@ -37,7 +37,7 @@ export function IntroVideo({ onClose }: { onClose: () => void }) {
       <div className="w-full anim-pop" style={{ maxWidth: 'min(1100px, calc((100dvh - 200px) * 16 / 9))' }}>
         <div className="flex items-end justify-between gap-4 mb-3.5 text-white">
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-white/60">Hoş geldiniz</p>
+            <p className="text-[13px] font-medium text-white/60">Hoş geldiniz · {INTRO_VIDEO.length} dakikalık tanıtım</p>
             <h2 className="text-[21px] sm:text-[24px] font-semibold tracking-[-0.025em] leading-tight">Canlı Sesli Tercüman’ı tanıyın</h2>
           </div>
           <button type="button" onClick={onClose} className="intro-skip pressable h-9 pl-3 pr-3.5 rounded-full inline-flex items-center gap-1.5 text-[14px] font-semibold shrink-0 cursor-pointer">
@@ -59,11 +59,11 @@ export function IntroVideo({ onClose }: { onClose: () => void }) {
             className="absolute inset-0 w-full h-full object-contain"
           />
           {!started && (
-            <button type="button" onClick={play} className="intro-play absolute inset-0 flex flex-col items-center justify-center gap-3 cursor-pointer" aria-label="Tanıtım videosunu oynat">
+            // The key sits on the poster's sphere, clear of the title below it
+            <button type="button" onClick={play} className="intro-play absolute inset-0 cursor-pointer" aria-label="Tanıtım videosunu oynat">
               <span className="intro-play-key">
-                <Play className="w-8 h-8 translate-x-[2px]" fill="currentColor" strokeWidth={0} />
+                <Play className="w-[42%] h-[42%] translate-x-[6%]" fill="currentColor" strokeWidth={0} />
               </span>
-              <span className="intro-play-label">Tanıtımı izle · {INTRO_VIDEO.length}</span>
             </button>
           )}
         </div>

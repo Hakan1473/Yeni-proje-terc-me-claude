@@ -1093,7 +1093,7 @@ button {
 /* ───────────── First-run introduction video ───────────── */
 @layer components {
   .intro-backdrop {
-    background: radial-gradient(120% 90% at 50% 0%, rgb(40 48 90 / 0.55), transparent 60%), rgb(6 8 14 / 0.94);
+    background: radial-gradient(120% 90% at 50% 0%, rgb(40 48 90 / 0.55), transparent 60%), rgb(6 8 14 / 0.96);
     backdrop-filter: blur(24px) saturate(140%);
     -webkit-backdrop-filter: blur(24px) saturate(140%);
     padding-top: env(safe-area-inset-top, 0px);
@@ -1106,12 +1106,13 @@ button {
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
-  .intro-play {
-    background: linear-gradient(180deg, transparent 40%, rgb(0 0 0 / 0.35));
-  }
   .intro-play-key {
-    width: 84px;
-    height: 84px;
+    position: absolute;
+    left: 50%;
+    top: 36%;
+    translate: -50% -50%;
+    width: clamp(54px, 13%, 92px);
+    aspect-ratio: 1;
     border-radius: 999px;
     display: flex;
     align-items: center;
@@ -1128,12 +1129,5 @@ button {
   }
   .intro-play:active .intro-play-key {
     transform: scale(0.94);
-  }
-  .intro-play-label {
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    text-shadow: 0 1px 12px rgb(0 0 0 / 0.5);
   }
 }
