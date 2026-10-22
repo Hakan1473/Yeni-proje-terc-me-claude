@@ -14,6 +14,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { describeDrugMismatch } from '../../shared/medical/drugcheck';
 import { DRUGS } from '../../shared/medical/lexicon';
 import { describeNumberCheck } from '../../shared/numbers';
 import { TUTORIAL_VIDEOS } from '../../shared/tutorials';
@@ -260,6 +261,19 @@ const TurnCard = memo(function TurnCard({
           </span>
         </div>
       )}
+
+      {turn.drugCheck?.map((m) => (
+        <div
+          key={`${m.said}-${m.translated}`}
+          role="alert"
+          className="mt-2.5 rounded-[12px] bg-sys-red/10 text-[13px] leading-snug px-3 py-2 flex items-start gap-2"
+        >
+          <TriangleAlert className="w-4 h-4 text-sys-red shrink-0 mt-px" strokeWidth={2.25} />
+          <span className="flex-1">
+            <span className="font-semibold">İlaç adını teyit edin.</span> {describeDrugMismatch(m, turn.speaker)}.
+          </span>
+        </div>
+      ))}
 
       {turn.tutorial && <VideoCard kind={turn.tutorial} onPresent={onPresentVideo} />}
     </article>

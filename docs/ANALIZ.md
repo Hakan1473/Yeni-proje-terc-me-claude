@@ -196,7 +196,7 @@ Bitişik yazılmış soru eklerini ayırır ("ağrınızvarmı" → "Ağrınız 
 | Canlı transkript, akan çeviri | ✅ |
 | Kart başına dinleme, kopyalama, çevirme | ✅ dinleme, kopyalama, yeniden çevirme |
 | Yedek REST çeviri ve TTS, tarayıcı sesi | ✅ tek tur durum makinesiyle |
-| Anlık anamnez (9 kategori) ve HBYS'ye kopyalama | ✅ ek olarak olumsuz cevaplar, kanıt alıntısı ve yapay zekâ onayı |
+| Anlık anamnez (9 kategori) ve panoya kopyalama (hastane sistemine bağlantı yok) | ✅ ek olarak olumsuz cevaplar, kanıt alıntısı ve yapay zekâ onayı |
 | Konuşma özeti (6 başlık) ve kopyalama | ✅ yapay zekâ çalışmazsa yerel bulgulardan özet |
 | Çağrı butonu ve Triflow eğitim videoları (3 kez oynatma) | ✅ öğretme niyeti cümle bazında değerlendiriliyor |
 | Konuşma geçmişi: arama, ekrana yükleme, silme, kopyalama | ✅ IndexedDB ve otomatik silme |

@@ -1,4 +1,4 @@
-import { BookOpen, Check, ChevronRight, Clock, Hash, Lock, Monitor, Moon, Play, ShieldCheck, Square, Sun, Wind, Bell } from 'lucide-react';
+import { BookOpen, Check, Clapperboard, ChevronRight, Clock, Hash, Lock, Monitor, Moon, Play, ShieldCheck, Square, Sun, Wind, Bell } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { TUTORIAL_VIDEOS } from '../../../shared/tutorials';
 import type { Pace, TutorialKind, VoiceName } from '../../../shared/types';
@@ -31,12 +31,14 @@ export function SettingsSheet({
   theme,
   onTheme,
   onGuide,
+  onIntro,
   onHistory,
 }: {
   onClose: () => void;
   theme: Theme;
   onTheme: (t: Theme) => void;
   onGuide: () => void;
+  onIntro: () => void;
   onHistory: () => void;
 }) {
   const voice = useStore(engine.store, (s) => s.voice);
@@ -291,6 +293,23 @@ export function SettingsSheet({
                 <span className="flex-1 min-w-0">
                   <span className="block text-[16px]">Hızlı Başlangıç Rehberi</span>
                   <span className="block text-[13px] text-label-2 truncate">Dil seçimi, iki yönlü konuşma, anamnez, videolar</span>
+                </span>
+                <ChevronRight className="w-4 h-4 text-label-3" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onIntro();
+                }}
+                className="hairline-t-inset w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer hover:bg-fill-2"
+              >
+                <span className="glyph w-[29px] h-[29px] bg-sys-indigo">
+                  <Clapperboard className="w-4 h-4" strokeWidth={2.25} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[16px]">Tanıtım Videosu</span>
+                  <span className="block text-[13px] text-label-2 truncate">Uygulamanın 1:42 dakikalık sesli tanıtımı</span>
                 </span>
                 <ChevronRight className="w-4 h-4 text-label-3" strokeWidth={2.5} />
               </button>

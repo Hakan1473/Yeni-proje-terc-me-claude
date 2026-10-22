@@ -1,8 +1,9 @@
 import { Type } from '@google/genai';
 import { type Express, json, Router } from 'express';
 import { getLanguage } from '../shared/languages';
-import { combineLayers, mergeFacts } from '../shared/medical/anamnesis';
-import { canonicalKey, DialogueState, drugIdentity, extractFacts } from '../shared/medical/extract';
+import { combineLayers, isRejected, mergeFacts } from '../shared/medical/anamnesis';
+import { applyDrugCheck, checkDrugNames, describeDrugMismatch, type DrugMismatch } from '../shared/medical/drugcheck';
+import { canonicalKey, DialogueState, drugIdentity, drugMentions, extractFacts } from '../shared/medical/extract';
 import { type TermInfo, type TermKind, termKey } from '../shared/medical/terms';
 import { fuseSpeaker } from '../shared/speaker';
 import { fold, words } from '../shared/text';
@@ -58,6 +59,18 @@ function isGrounded(evidence: string, turns: TurnInput[]): boolean {
     const hits = ev.filter((w) => hay.has(w)).length;
     return hits / ev.length >= 0.6;
   });
+}
+
+/**
+ * Drug names the translation got wrong, across the conversation. A drug the
+ * patient also said by name somewhere is not treated as a mistranslation.
+ */
+function drugMismatches(turns: TurnInput[]): DrugMismatch[] {
+  const said = new Set(turns.flatMap((t) => drugMentions(t.source).map((d) => d.identity)));
+  return turns
+    .filter((t) => t.speaker === 'patient' && t.translation)
+    .flatMap((t) => checkDrugNames(t.source, t.translation ?? ''))
+    .filter((m) => !m.translatedIdentity || !said.has(m.translatedIdentity));
 }
 
 function localAnamnesis(turns: TurnInput[], known: Fact[]): Fact[] {
@@ -128,7 +141,7 @@ export function mountRoutes(app: Express): void {
   api.post('/anamnesis', rateLimit('anamnesis', 40), async (req, res) => {
     const body = req.body as Partial<AnamnesisRequest>;
     const lang = cleanString(body?.languageName, 60) || 'Yabancı dil';
-    const turns = readTurns(body?.turns, 80);
+    const turns = readTurns(body?.turns, 150);
     const known: Fact[] = (Array.isArray(body?.facts) ? body.facts : [])
       .slice(0, 150)
       .filter((f) => CATEGORIES.includes(f?.category))
@@ -137,8 +150,18 @@ export function mountRoutes(app: Express): void {
         return { key: canonicalKey(f.category, text), category: f.category, text, negated: !!f.negated, origin: 'ai' as const, at: 0 };
       });
 
+    const rejected = (Array.isArray(body?.rejected) ? body.rejected : [])
+      .slice(0, 100)
+      .filter((f) => CATEGORIES.includes(f?.category))
+      .map((f) => ({ category: f.category, text: cleanString(f.text, 160) }))
+      .filter((f) => f.text);
+    const mismatches = drugMismatches(turns);
+    // Final pass for every answer: the patient's own drug names, minus what the nurse removed
+    const finish = <T extends Pick<Fact, 'key' | 'category' | 'text'>>(facts: T[]) =>
+      applyDrugCheck(facts, mismatches).filter((f) => !isRejected(f, rejected));
+
     if (config.mock || turns.length === 0) {
-      const facts = localAnamnesis(turns, known);
+      const facts = finish(localAnamnesis(turns, known));
       res.json({ facts, retracted: [] });
       return;
     }
@@ -147,18 +170,24 @@ export function mountRoutes(app: Express): void {
       facts?: { category: string; text: string; negated?: boolean; evidence?: string; turnId?: string }[];
       retracted?: string[];
     }>({
-      models: [config.models.fast, config.models.smart],
+      // Accuracy matters more than speed here: the smarter model reads the whole conversation
+      models: [config.models.smart, config.models.fast],
       system: anamnesisInstruction,
       input: {
         patient_language: lang,
         known_facts: known.map(({ category, text, negated }) => ({ category, text, negated })),
-        turns: turns.map((t) => ({
-          turnId: t.id,
-          speaker: t.speaker === 'nurse' ? 'Hemşire (Türkçe)' : `Hasta (${lang})`,
-          said: t.source,
-          turkish: turkishText(t) || undefined,
-          context: t.context || undefined,
-        })),
+        rejected_by_nurse: rejected.length ? rejected : undefined,
+        turns: turns.map((t) => {
+          const drugWarnings = t.speaker === 'patient' && t.translation ? checkDrugNames(t.source, t.translation).map((m) => describeDrugMismatch(m, t.speaker)) : [];
+          return {
+            turnId: t.id,
+            speaker: t.speaker === 'nurse' ? 'Hemşire (Türkçe)' : `Hasta (${lang})`,
+            said: t.source,
+            turkish: turkishText(t) || undefined,
+            drug_name_warning: drugWarnings.length ? drugWarnings.join('; ') : undefined,
+            context: t.context || undefined,
+          };
+        }),
       },
       schema: {
         type: Type.OBJECT,
@@ -181,7 +210,7 @@ export function mountRoutes(app: Express): void {
         },
         required: ['facts'],
       },
-      timeoutMs: 15000,
+      timeoutMs: 25000,
       temperature: 0,
     });
 
@@ -229,7 +258,7 @@ export function mountRoutes(app: Express): void {
       .map((r) => cleanString(r, 160))
       .flatMap((r) => known.filter((k) => fold(k.text) === fold(r) || k.key === canonicalKey(k.category, r)).map((k) => k.key));
 
-    res.json({ facts, retracted });
+    res.json({ facts: finish(facts), retracted });
   });
 
   api.post('/summary', rateLimit('summary', 20), async (req, res) => {

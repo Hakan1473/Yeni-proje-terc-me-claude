@@ -1,3 +1,4 @@
+import type { DrugMismatch } from './medical/drugcheck';
 // Types shared by the browser client and the Node server.
 
 export type Speaker = 'nurse' | 'patient';
@@ -64,6 +65,8 @@ export interface Turn {
   createdAt: number;
   tutorial?: TutorialKind;
   numberCheck?: NumberCheck;
+  /** Drug names that differ between what was said and the translation. */
+  drugCheck?: DrugMismatch[];
 }
 
 export interface Note {
@@ -100,6 +103,8 @@ export interface Fact {
   origin: 'local' | 'ai';
   /** Safety-critical facts (explicit allergy statements) the AI layer may not silently drop. */
   pinned?: boolean;
+  /** Why this fact must be confirmed with the patient (e.g. the drug name differed between speech and translation). */
+  verify?: string;
   at: number;
 }
 
@@ -122,6 +127,8 @@ export interface ConversationRecord {
   items: ConversationItem[];
   summary?: ConversationSummary | null;
   facts?: Fact[];
+  /** Facts the nurse removed after checking with the patient; never re-added. */
+  rejected?: Fact[];
   preview: string;
 }
 
@@ -132,10 +139,12 @@ export interface AnamnesisRequest {
   facts: Pick<Fact, 'category' | 'text' | 'negated'>[];
   /** Turns not yet seen by the AI, plus a little preceding context. */
   turns: { id: string; speaker: Speaker; source: string; translation?: string; context?: boolean }[];
+  /** Facts the nurse removed after checking with the patient. */
+  rejected?: Pick<Fact, 'category' | 'text'>[];
 }
 
 export interface AnamnesisResponse {
-  facts: Pick<Fact, 'key' | 'category' | 'text' | 'negated' | 'evidence' | 'turnId'>[];
+  facts: Pick<Fact, 'key' | 'category' | 'text' | 'negated' | 'evidence' | 'turnId' | 'verify'>[];
   /** Facts the conversation explicitly corrected or denied. */
   retracted: string[];
 }

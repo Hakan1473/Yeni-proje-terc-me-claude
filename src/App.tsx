@@ -5,6 +5,7 @@ import { Conversation } from './components/Conversation';
 import { Dock } from './components/Dock';
 import { LanguageRail, NavBar } from './components/NavBar';
 import { AccessGate, FaceToFace, Onboarding, Toast, TypeSheet } from './components/Overlays';
+import { IntroVideo } from './components/IntroVideo';
 import { HistorySheet } from './components/sheets/HistorySheet';
 import { LanguageSheet } from './components/sheets/LanguageSheet';
 import { SettingsSheet } from './components/sheets/SettingsSheet';
@@ -18,7 +19,7 @@ import type { TutorialKind } from '../shared/types';
 import { useStore } from './lib/store';
 import { engine } from './live/engine';
 
-type SheetName = 'languages' | 'settings' | 'history' | 'summary' | 'type' | 'guide' | 'face';
+type SheetName = 'languages' | 'settings' | 'history' | 'summary' | 'type' | 'guide' | 'face' | 'intro';
 type Pane = 'dialogue' | 'anamnesis';
 
 const WIDE = '(min-width: 1024px), (min-width: 768px) and (orientation: landscape)';
@@ -79,7 +80,15 @@ export default function App() {
 
   const finishSplash = useCallback(() => {
     setSplash(false);
-    if (!loadSettings().onboardingDone) setSheet('guide');
+    const s = loadSettings();
+    // First launch: the introduction video once, then the quick-start guide
+    if (!s.introSeen) setSheet('intro');
+    else if (!s.onboardingDone) setSheet('guide');
+  }, []);
+
+  const closeIntro = useCallback(() => {
+    saveSettings({ introSeen: true });
+    setSheet(loadSettings().onboardingDone ? null : 'guide');
   }, []);
 
   const changeTheme = (t: Theme) => {
@@ -199,7 +208,10 @@ export default function App() {
 
       {sheet === 'languages' && <LanguageSheet onClose={closeSheet} />}
       {sheet === 'settings' && (
-        <SettingsSheet onClose={closeSheet} theme={theme} onTheme={changeTheme} onGuide={() => setSheet('guide')} onHistory={() => setSheet('history')} />
+        <SettingsSheet onClose={closeSheet} theme={theme} onTheme={changeTheme} onGuide={() => setSheet('guide')}
+          onIntro={() => setSheet('intro')}
+          onHistory={() => setSheet('history')}
+        />
       )}
       {sheet === 'history' && <HistorySheet onClose={closeSheet} />}
       {sheet === 'summary' && <SummarySheet onClose={closeSheet} />}
@@ -213,6 +225,7 @@ export default function App() {
           }}
         />
       )}
+      {sheet === 'intro' && <IntroVideo onClose={closeIntro} />}
       {sheet === 'guide' && (
         <Onboarding
           onClose={() => {

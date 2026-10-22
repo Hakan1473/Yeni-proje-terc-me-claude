@@ -28,6 +28,8 @@ export interface Settings {
   pace: Pace;
   languageCode: string;
   onboardingDone: boolean;
+  /** The first-run introduction video was shown (watched or skipped). */
+  introSeen: boolean;
   /** Days to keep conversations; 0 keeps them until deleted. */
   retentionDays: number;
 }
@@ -43,6 +45,7 @@ export function loadSettings(): Settings {
     pace: pace === 'fast' || pace === 'patient' ? pace : 'balanced',
     languageCode: lang && LANGUAGES.some((l) => l.code === lang) ? lang : DEFAULT_LANGUAGE.code,
     onboardingDone: read('tr.onboarded') === '1',
+    introSeen: read('tr.introSeen') === '1',
     retentionDays: Number(read('tr.retention') ?? '0') || 0,
   };
 }
@@ -53,6 +56,7 @@ export function saveSettings(s: Partial<Settings>) {
   if (s.pace) write('tr.pace', s.pace);
   if (s.languageCode) write('tr.language', s.languageCode);
   if (s.onboardingDone !== undefined) write('tr.onboarded', s.onboardingDone ? '1' : null);
+  if (s.introSeen !== undefined) write('tr.introSeen', s.introSeen ? '1' : null);
   if (s.retentionDays !== undefined) write('tr.retention', String(s.retentionDays));
 }
 

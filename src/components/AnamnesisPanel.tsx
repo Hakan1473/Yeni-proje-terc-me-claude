@@ -13,10 +13,12 @@ import {
   Pill,
   Scissors,
   Stethoscope,
+  Trash2,
   TriangleAlert,
+  Undo2,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORY_TITLES, factText, formatAnamnesisReport, groupFacts } from '../../shared/medical/anamnesis';
 import { type TermQuery, termOf } from '../../shared/medical/terms';
 import type { Fact, FactCategory } from '../../shared/types';
@@ -65,44 +67,192 @@ function SyncStatus() {
   return <span>Konuşma sırasında otomatik çıkarılır</span>;
 }
 
+// Swipe distances (px): the delete action's width, and the travel that deletes on release
+const ACTION_W = 84;
+const COMMIT_RATIO = 0.55;
+
+/**
+ * Swipe left to reveal "Sil", or swipe all the way to delete (as in iOS Mail).
+ * Vertical drags scroll as usual; a hover button does the same with a mouse.
+ */
 function FactRow({
   fact,
   critical,
   first,
+  revealed,
+  onReveal,
   onExplain,
+  onDelete,
 }: {
   fact: Fact;
   critical: boolean;
   first: boolean;
+  revealed: boolean;
+  onReveal: (on: boolean) => void;
   onExplain?: () => void;
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const face = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: number; x: number; y: number; base: number; dx: number; swiping: boolean } | null>(null);
+  const swiped = useRef(false);
   const tappable = !!onExplain || !!fact.evidence;
+
+  const place = (dx: number, animate: boolean) => {
+    const el = face.current;
+    const row = el?.parentElement;
+    if (!el || !row) return;
+    // The red action grows from the right edge as the row slides away
+    row.dataset.animate = animate ? '1' : '';
+    row.style.setProperty('--reveal', `${Math.max(0, -dx)}px`);
+    el.style.transform = dx ? `translate3d(${dx}px,0,0)` : '';
+  };
+
+  useEffect(() => {
+    if (!drag.current) place(revealed ? -ACTION_W : 0, true);
+  }, [revealed]);
+
+  const remove = () => {
+    const w = face.current?.offsetWidth ?? 400;
+    place(-w, true);
+    setLeaving(true);
+    window.setTimeout(onDelete, 260);
+  };
+
+  const down = (e: ReactPointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, base: revealed ? -ACTION_W : 0, dx: 0, swiping: false };
+    swiped.current = false;
+  };
+  const move = (e: ReactPointerEvent) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.swiping) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        drag.current = null;
+        return;
+      }
+      if (Math.abs(dx) < 8) return;
+      d.swiping = true;
+      swiped.current = true;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+    const w = face.current?.offsetWidth ?? 400;
+    // Rubber band past the resting points
+    let x = d.base + dx;
+    if (x > 0) x = x / 4;
+    if (x < -w) x = -w;
+    d.dx = x;
+    place(x, false);
+  };
+  const up = (e: ReactPointerEvent) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.id !== e.pointerId || !d.swiping) return;
+    const w = face.current?.offsetWidth ?? 400;
+    if (d.dx < -w * COMMIT_RATIO) remove();
+    else {
+      const on = d.dx < -ACTION_W / 2;
+      place(on ? -ACTION_W : 0, true);
+      onReveal(on);
+    }
+  };
+
+  const tap = () => {
+    if (swiped.current) {
+      swiped.current = false;
+      return;
+    }
+    if (revealed) {
+      onReveal(false);
+      return;
+    }
+    if (onExplain) onExplain();
+    else if (fact.evidence) setOpen((o) => !o);
+  };
+
   return (
-    <li className={first ? '' : 'hairline-t-inset'}>
-      <button
-        type="button"
-        onClick={() => (onExplain ? onExplain() : fact.evidence && setOpen((o) => !o))}
-        aria-expanded={!onExplain && fact.evidence ? open : undefined}
-        aria-haspopup={onExplain ? 'dialog' : undefined}
-        className={`row-press w-full text-left pl-4 pr-3 py-[11px] flex items-center gap-2 ${tappable ? 'cursor-pointer' : 'cursor-default'}`}
-      >
-        <span
-          className={`flex-1 text-[15px] leading-snug tracking-[-0.012em] ${
-            fact.negated ? 'text-label-2' : critical ? 'text-sys-red font-semibold' : 'text-label'
-          }`}
-        >
-          {factText(fact)}
-        </span>
-        {fact.origin === 'ai' && <BadgeCheck className="w-[17px] h-[17px] text-accent shrink-0" strokeWidth={2} aria-label="Yapay zekâ doğruladı" />}
-        {onExplain && <ChevronRight className="w-4 h-4 text-label-3 shrink-0 -mr-0.5" strokeWidth={2.5} aria-hidden="true" />}
+    <li
+      className={`swipe-row group ${first ? '' : 'hairline-t-inset'} ${leaving ? 'is-leaving' : ''}`}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+    >
+      <button type="button" className="swipe-action" onClick={remove} tabIndex={revealed ? 0 : -1} aria-hidden={!revealed}>
+        <Trash2 className="w-[18px] h-[18px]" strokeWidth={2.25} />
+        <span>Sil</span>
       </button>
-      {open && fact.evidence && (
-        <p dir="auto" className="-mt-1 pl-4 pr-4 pb-2.5 text-[13px] italic text-label-2 leading-snug anim-fade">
-          “{fact.evidence}”
-        </p>
-      )}
+      <div ref={face} className="swipe-face">
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={tap}
+            aria-expanded={!onExplain && fact.evidence ? open : undefined}
+            aria-haspopup={onExplain ? 'dialog' : undefined}
+            className={`row-press flex-1 min-w-0 text-left pl-4 pr-3 py-[11px] flex items-center gap-2 ${tappable ? 'cursor-pointer' : 'cursor-default'}`}
+          >
+            <span
+              className={`flex-1 text-[15px] leading-snug tracking-[-0.012em] ${
+                fact.negated ? 'text-label-2' : critical ? 'text-sys-red font-semibold' : 'text-label'
+              }`}
+            >
+              {factText(fact)}
+            </span>
+            {fact.verify ? (
+              <span className="shrink-0 h-[20px] px-1.5 rounded-full bg-sys-orange/15 text-sys-orange text-[11px] font-semibold inline-flex items-center gap-1">
+                <TriangleAlert className="w-3 h-3" strokeWidth={2.5} />
+                Teyit
+              </span>
+            ) : (
+              fact.origin === 'ai' && <BadgeCheck className="w-[17px] h-[17px] text-accent shrink-0" strokeWidth={2} aria-label="Yapay zekâ doğruladı" />
+            )}
+            {onExplain && <ChevronRight className="w-4 h-4 text-label-3 shrink-0 -mr-0.5" strokeWidth={2.5} aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            onClick={remove}
+            aria-label={`${factText(fact)} maddesini sil`}
+            title="Sil"
+            className="swipe-hover-delete pressable w-8 h-8 mr-2 rounded-full text-label-3 hover:text-sys-red hover:bg-sys-red/10 items-center justify-center shrink-0 cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+        {fact.verify && (
+          <p className="-mt-1.5 pl-4 pr-4 pb-2.5 text-[12.5px] text-sys-orange leading-snug">{fact.verify}</p>
+        )}
+        {open && fact.evidence && (
+          <p dir="auto" className="-mt-1 pl-4 pr-4 pb-2.5 text-[13px] italic text-label-2 leading-snug anim-fade">
+            “{fact.evidence}”
+          </p>
+        )}
+      </div>
     </li>
+  );
+}
+
+/** "Silindi · Geri al" bar after a swipe delete. */
+function UndoBar({ fact, onUndo, onDone }: { fact: Fact; onUndo: () => void; onDone: () => void }) {
+  useEffect(() => {
+    const t = window.setTimeout(onDone, 6000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div role="status" className="sticky bottom-3 z-10 flex justify-center pointer-events-none anim-toast">
+      <div className="pointer-events-auto flex items-center gap-3 max-w-full pl-4 pr-1.5 py-1.5 rounded-full material shadow-float">
+        <p className="min-w-0 truncate text-[13px] font-medium">
+          <span className="text-label-2">Silindi:</span> {factText(fact)}
+        </p>
+        <button type="button" onClick={onUndo} className="pressable h-8 px-3 rounded-full btn-tinted text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer">
+          <Undo2 className="w-3.5 h-3.5" strokeWidth={2.5} />
+          Geri al
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -111,7 +261,14 @@ export function AnamnesisPanel() {
   const language = useStore(engine.store, (s) => s.language);
   const [copied, setCopied] = useState(false);
   const [explain, setExplain] = useState<{ fact: Fact; query: TermQuery } | null>(null);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<Fact | null>(null);
   const closeExplain = useCallback(() => setExplain(null), []);
+  const clearRemoved = useCallback(() => setRemoved(null), []);
+  const undo = () => {
+    if (removed) engine.restoreFact(removed);
+    setRemoved(null);
+  };
   const groups = groupFacts(facts);
   const total = facts.length;
 
@@ -152,7 +309,7 @@ export function AnamnesisPanel() {
               className={`pressable h-8 px-3.5 rounded-full inline-flex items-center gap-1.5 text-[13px] font-semibold cursor-pointer shrink-0 ${
                 copied ? 'bg-sys-green/15 text-sys-green' : 'btn-tinted'
               }`}
-              title="HBYS'ye yapıştırmak için kopyala"
+              title="Anamnezi panoya kopyala"
             >
               {copied ? <Check className="w-3.5 h-3.5" strokeWidth={2.75} /> : <Copy className="w-3.5 h-3.5" strokeWidth={2.25} />}
               {copied ? 'Kopyalandı' : 'Kopyala'}
@@ -192,7 +349,14 @@ export function AnamnesisPanel() {
                           fact={f}
                           critical={critical && !f.negated}
                           first={i === 0}
+                          revealed={revealed === f.key}
+                          onReveal={(on) => setRevealed(on ? f.key : null)}
                           onExplain={query ? () => setExplain({ fact: f, query }) : undefined}
+                          onDelete={() => {
+                            engine.dismissFact(f);
+                            setRevealed(null);
+                            setRemoved(f);
+                          }}
                         />
                       );
                     })}
@@ -205,11 +369,13 @@ export function AnamnesisPanel() {
             <Info className="w-4 h-4 text-label-2 shrink-0 mt-[1px]" strokeWidth={2.25} />
             <p className="text-[12.5px] text-label-2 leading-snug">
               <span className="font-semibold text-label">Yapay zekâ hata yapabilir.</span> Alerji, ilaç ve doz bilgilerini uygulamadan önce
-              hastayla doğrulayın. Tıbbi terime dokunarak kısa bilgi kartını açabilirsiniz.
+              hastayla doğrulayın. Yanlış bir maddeyi sola kaydırarak silebilirsiniz; yapay zekâ onu bir daha eklemez. Tıbbi terime dokunarak kısa bilgi kartını açabilirsiniz.
             </p>
           </div>
         </>
       )}
+
+      {removed && <UndoBar key={removed.key} fact={removed} onUndo={undo} onDone={clearRemoved} />}
 
       {explain && (
         <TermSheet

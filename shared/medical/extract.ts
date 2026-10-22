@@ -151,6 +151,8 @@ const FUZZY_DRUG_ALIASES = DRUGS.flatMap((d) =>
 
 // Frequent words that sit within one edit of a drug name.
 const FUZZY_STOP = new Set(['kullan', 'kalbim', 'parola', 'paralar', 'zaman', 'insanlar']);
+// Word stems that sit within one edit of a drug name in any inflection ("kolesterolüm" ~ "kolestor").
+const FUZZY_STOP_STEM = /^(?:kolesterol|cholesterol)/;
 
 /** Spelling-independent key: brand names are often written as heard ("ogmentin", "voltaren"). */
 function phonetic(text: string): string {
@@ -172,7 +174,7 @@ function fuzzyDrugHits(text: string, taken: Hit<DrugEntry>[], anyContext = false
   for (const m of text.matchAll(/\p{L}{6,}/gu)) {
     const token = m[0];
     const start = m.index ?? 0;
-    if (FUZZY_STOP.has(token) || taken.some((t) => start < t.end && t.start < start + token.length)) continue;
+    if (FUZZY_STOP.has(token) || FUZZY_STOP_STEM.test(token) || taken.some((t) => start < t.end && t.start < start + token.length)) continue;
     const p = phonetic(token);
     for (const { alias, entry } of FUZZY_DRUG_ALIASES) {
       const a = phonetic(alias);
@@ -688,6 +690,34 @@ function answerPendingQuestion(
  * Map a free-text fact (e.g. from the AI layer: "Parol 500 mg") onto the same
  * key the local extractor would produce, so both layers deduplicate.
  */
+export interface DrugMention {
+  /** Folded active ingredient (or brand when unknown): the same drug under any name. */
+  identity: string;
+  /** Display label, e.g. "Alipza (pitavastatin)". */
+  label: string;
+  /** The words as they appear in the text. */
+  surface: string;
+}
+
+/**
+ * Drug names in any utterance, in the original or the translated language.
+ * With `misheard`, names the recogniser spelled as heard are matched
+ * phonetically too, but only when they look like a name (capitalised) or sit in
+ * a medication context, to keep everyday words out.
+ */
+export function drugMentions(text: string, misheard = true): DrugMention[] {
+  const lower = lowerTr(text);
+  const exact = findHits(lower, DRUG_M);
+  const fuzzy = !misheard ? [] : fuzzyDrugHits(lower, exact, true).filter((h) => /^\p{Lu}/u.test(text.slice(h.start, h.end)) || MED_CONTEXT.test(lower));
+  return [...exact, ...fuzzy]
+    .sort((a, b) => a.start - b.start)
+    .map((h) => ({
+      identity: fold(h.entry.generic ?? h.entry.name),
+      label: drugLabel(h.entry, h.alias),
+      surface: text.slice(h.start, h.end),
+    }));
+}
+
 /** Active ingredient (or brand) a fact names, to spot one drug filed under two categories. */
 export function drugIdentity(text: string): string | null {
   const h = findHits(lowerTr(text), DRUG_M)[0];

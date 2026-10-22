@@ -80,7 +80,7 @@ describe('combineLayers', () => {
 });
 
 describe('report', () => {
-  it('formats sections for HBYS', () => {
+  it('formats sections as a plain-text report', () => {
     const text = formatAnamnesisReport(
       [fact('allergy:penisilin', 'Penisilin', 1), fact('complaint:ates', 'Ateş', 1, { negated: true })],
       'İngilizce',

@@ -232,7 +232,7 @@ const STEPS: { title: string; body: string; glyph: string; visual: ReactNode }[]
   },
   {
     title: 'Anamnez kendiliğinden oluşur',
-    body: 'Şikayetler, ilaçlar (dozuyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar ve istekler konuşurken ayrıştırılır. "Alerjim yok" gibi yanıtlar ayrı gösterilir; tek dokunuşla HBYS’ye kopyalanır.',
+    body: 'Şikayetler, ilaçlar (dozuyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar ve istekler konuşurken ayrıştırılır. "Alerjim yok" gibi yanıtlar ayrı gösterilir. Yanlış bir maddeyi hastayla teyit edip sola kaydırarak silebilirsiniz.',
     glyph: 'bg-sys-indigo',
     visual: (
       <div className="grid grid-cols-2 gap-2 text-left">

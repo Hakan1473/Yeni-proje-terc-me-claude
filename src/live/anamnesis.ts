@@ -1,4 +1,5 @@
-import { type AiLayer, combineLayers, mergeFacts } from '../../shared/medical/anamnesis';
+import { type AiLayer, combineLayers, isRejected, mergeFacts } from '../../shared/medical/anamnesis';
+import { applyDrugCheck } from '../../shared/medical/drugcheck';
 import { DialogueState, extractFacts } from '../../shared/medical/extract';
 import type { Fact, Turn } from '../../shared/types';
 import * as api from '../lib/api';
@@ -8,11 +9,11 @@ export type AiStatus = 'idle' | 'syncing' | 'ok' | 'error';
 interface Hooks {
   turns(): Turn[];
   languageName(): string;
-  publish(facts: Fact[], status: AiStatus, syncedAt: number | null): void;
+  publish(facts: Fact[], rejected: Fact[], status: AiStatus, syncedAt: number | null): void;
 }
 
 const DEBOUNCE_MS = 1200;
-const MAX_TURNS = 80;
+const MAX_TURNS = 150;
 
 /**
  * Two-layer live anamnesis.
@@ -21,10 +22,13 @@ const MAX_TURNS = 80;
  *   the current fact list. Rereading everything each time lets the AI see which
  *   question an answer belongs to ("Any allergies?" → "Yes. Amlodis, Avil.")
  *   and correct its own earlier mistakes. See combineLayers() for merging.
+ * Facts the nurse removed (after checking with the patient) stay removed: they
+ * are filtered from both layers and sent to the AI as rejected.
  */
 export class AnamnesisSync {
   private local: Fact[] = [];
   private ai: AiLayer | null = null;
+  private rejected: Fact[] = [];
   private dialogue = new DialogueState();
   private timer: number | null = null;
   private inFlight: AbortController | null = null;
@@ -37,7 +41,8 @@ export class AnamnesisSync {
   onTurn(turn: Turn) {
     const text = turn.speaker === 'nurse' ? turn.source : turn.translation;
     if (!text?.trim()) return;
-    const facts = extractFacts({ id: turn.id, speaker: turn.speaker, text, at: turn.createdAt }, this.dialogue);
+    // A drug name the translation got wrong is filed under the name the speaker said
+    const facts = applyDrugCheck(extractFacts({ id: turn.id, speaker: turn.speaker, text, at: turn.createdAt }, this.dialogue), turn.drugCheck ?? []);
     this.local = mergeFacts(this.local, facts);
     this.emit();
     this.schedule();
@@ -61,7 +66,7 @@ export class AnamnesisSync {
     const fresh = done.filter((t) => t.createdAt > watermark);
     if (fresh.length === 0) return;
     const recent = done.slice(-MAX_TURNS);
-    const known = combineLayers(this.local, this.ai);
+    const known = this.combined();
     const controller = new AbortController();
     this.inFlight = controller;
     this.setStatus('syncing');
@@ -71,6 +76,7 @@ export class AnamnesisSync {
           languageName: this.hooks.languageName(),
           facts: known.map(({ category, text, negated }) => ({ category, text, negated })),
           turns: recent.map((t) => ({ id: t.id, speaker: t.speaker, source: t.source, translation: t.translation })),
+          rejected: this.rejected.map(({ category, text }) => ({ category, text })),
         },
         controller.signal,
       );
@@ -106,21 +112,38 @@ export class AnamnesisSync {
     this.emit();
   }
 
+  private combined(): Fact[] {
+    return combineLayers(this.local, this.ai).filter((f) => !isRejected(f, this.rejected));
+  }
+
   private emit() {
-    this.hooks.publish(combineLayers(this.local, this.ai), this.status, this.syncedAt);
+    this.hooks.publish(this.combined(), this.rejected, this.status, this.syncedAt);
+  }
+
+  /** The nurse checked with the patient and removed this fact. */
+  dismiss(fact: Fact) {
+    this.rejected = [...this.rejected.filter((r) => r.key !== fact.key), fact];
+    this.emit();
+  }
+
+  /** Undo a removal. */
+  restore(fact: Fact) {
+    this.rejected = this.rejected.filter((r) => r.key !== fact.key);
+    this.emit();
   }
 
   /**
    * New or restored conversation. Restored facts become an already-reviewed
    * AI layer up to `watermark`, so only new turns are sent next time.
    */
-  reset(facts: Fact[] = [], watermark = 0) {
+  reset(facts: Fact[] = [], watermark = 0, rejected: Fact[] = []) {
     this.inFlight?.abort();
     this.inFlight = null;
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
     this.local = watermark ? [] : facts;
     this.ai = watermark ? { facts, retracted: [], watermark } : null;
+    this.rejected = rejected;
     this.dialogue = new DialogueState();
     this.status = 'idle';
     this.syncedAt = null;

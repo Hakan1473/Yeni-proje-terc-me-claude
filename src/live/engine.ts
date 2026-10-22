@@ -1,5 +1,6 @@
 import { getLanguage, TURKISH_BCP47 } from '../../shared/languages';
 import { appendFragment, normalizeTranscript } from '../../shared/normalize';
+import { checkDrugNames } from '../../shared/medical/drugcheck';
 import { checkNumbers } from '../../shared/numbers';
 import { fuseSpeaker } from '../../shared/speaker';
 import { detectTutorial } from '../../shared/tutorials';
@@ -35,6 +36,8 @@ export interface AppState {
   pace: Pace;
   items: ConversationItem[];
   facts: Fact[];
+  /** Facts the nurse removed from the anamnesis. */
+  rejected: Fact[];
   aiStatus: AiStatus;
   aiSyncedAt: number | null;
   conversationId: string;
@@ -121,8 +124,8 @@ class Engine {
   private readonly anamnesis = new AnamnesisSync({
     turns: () => this.turns(),
     languageName: () => this.store.get().language.nameTr,
-    publish: (facts, aiStatus, aiSyncedAt) => {
-      this.store.set({ facts, aiStatus, aiSyncedAt });
+    publish: (facts, rejected, aiStatus, aiSyncedAt) => {
+      this.store.set({ facts, rejected, aiStatus, aiSyncedAt });
       this.scheduleSave();
     },
   });
@@ -137,6 +140,7 @@ class Engine {
       pace: s.pace,
       items: [],
       facts: [],
+      rejected: [],
       aiStatus: 'idle',
       aiSyncedAt: null,
       conversationId: newId('c'),
@@ -403,6 +407,7 @@ class Engine {
     const trLang = textLang(who, 'translation', target);
     const source = normalizeTranscript(open.source, srcLang, { final: true });
     const translation = open.translation ? normalizeTranscript(open.translation, trLang, { final: true }) : undefined;
+    const drugCheck = translation && source ? checkDrugNames(source, translation) : [];
     const turn: Partial<Turn> = {
       speaker: who,
       speakerConfidence: guess.confidence,
@@ -410,6 +415,7 @@ class Engine {
       translation,
       status: translation ? 'done' : 'failed',
       numberCheck: translation && source ? checkNumbers(source, srcLang, translation, trLang) : undefined,
+      drugCheck: drugCheck.length ? drugCheck : undefined,
       tutorial: who === 'nurse' ? detectTutorial(source, translation) : undefined,
     };
     this.updateTurn(open.id, turn);
@@ -578,6 +584,7 @@ class Engine {
       items: s.items,
       summary: s.summary,
       facts: s.facts,
+      rejected: s.rejected,
       preview: preview.length > 160 ? `${preview.slice(0, 157)}…` : preview,
     };
   }
@@ -627,8 +634,21 @@ class Engine {
       language,
     });
     const last = record.items.at(-1)?.createdAt ?? 0;
-    this.anamnesis.reset(record.facts ?? [], last);
+    this.anamnesis.reset(record.facts ?? [], last, record.rejected ?? []);
     this.pushConfig(true);
+  }
+
+  // ───────────────────────── anamnesis ─────────────────────────
+
+  /** Remove a fact the nurse found wrong after checking with the patient; the AI will not add it again. */
+  dismissFact(fact: Fact) {
+    this.anamnesis.dismiss(fact);
+    this.scheduleSave();
+  }
+
+  restoreFact(fact: Fact) {
+    this.anamnesis.restore(fact);
+    this.scheduleSave();
   }
 
   // ───────────────────────── toasts ─────────────────────────

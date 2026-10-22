@@ -1,5 +1,5 @@
 import type { Fact, FactCategory } from '../types';
-import { drugIdentity } from './extract';
+import { canonicalKey, drugIdentity } from './extract';
 
 export const CATEGORY_ORDER: FactCategory[] = [
   'complaint',
@@ -61,6 +61,18 @@ export function mergeFacts(existing: Fact[], incoming: Fact[]): Fact[] {
     byKey.set(f.key, prev?.pinned && !f.negated ? { ...f, pinned: true } : f);
   }
   return Array.from(byKey.values());
+}
+
+/**
+ * A fact the nurse removed: the same entry, or the same drug in the same
+ * category under another wording ("Eliquis" and "Eliquis (apiksaban) 5 mg").
+ */
+export function isRejected(fact: Pick<Fact, 'key' | 'category' | 'text'>, rejected: Pick<Fact, 'category' | 'text'>[]): boolean {
+  const key = canonicalKey(fact.category, fact.text);
+  const id = drugIdentity(fact.text);
+  return rejected.some(
+    (r) => r.category === fact.category && (canonicalKey(r.category, r.text) === key || fact.key === canonicalKey(r.category, r.text) || (!!id && drugIdentity(r.text) === id)),
+  );
 }
 
 export interface AiLayer {
@@ -125,7 +137,10 @@ export function groupFacts(facts: Fact[]): { category: FactCategory; facts: Fact
   );
 }
 
-/** Plain-text report for pasting into the hospital information system (HBYS). */
+/**
+ * Plain-text report the nurse can copy for their own notes. The app has no link
+ * to any hospital system and never sends data to one.
+ */
 export function formatAnamnesisReport(facts: Fact[], languageName: string, now = new Date()): string {
   const lines = [
     '=== KLİNİK ANAMNEZ VE VAKA BİLGİSİ ===',
