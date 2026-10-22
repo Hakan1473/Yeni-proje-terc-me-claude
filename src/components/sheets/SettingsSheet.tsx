@@ -292,7 +292,7 @@ export function SettingsSheet({
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="block text-[16px]">Hızlı Başlangıç Rehberi</span>
-                  <span className="block text-[13px] text-label-2 truncate">Dil seçimi, iki yönlü konuşma, anamnez, videolar</span>
+                  <span className="block text-[13px] text-label-2 truncate">Ekrandaki düğmeleri adım adım tanıtır</span>
                 </span>
                 <ChevronRight className="w-4 h-4 text-label-3" strokeWidth={2.5} />
               </button>

@@ -1134,3 +1134,88 @@ button {
     transform: scale(0.94);
   }
 }
+
+/* ───────────── Live walkthrough (coach marks) ───────────── */
+@layer components {
+  .tour {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+  }
+  .tour-spotlight {
+    position: fixed;
+    pointer-events: none;
+    /* The dimmed screen is the spotlight's own shadow, so the lit area moves as one piece */
+    box-shadow: 0 0 0 200vmax rgb(6 9 20 / 0.66), 0 0 0 2px rgb(255 255 255 / 0.85), 0 0 28px 6px rgb(120 170 255 / 0.55);
+    transition: left 0.5s var(--ease-apple), top 0.5s var(--ease-apple), width 0.5s var(--ease-apple), height 0.5s var(--ease-apple),
+      border-radius 0.5s var(--ease-apple);
+    animation: tour-in 0.45s ease both;
+  }
+  .tour-spotlight::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid rgb(255 255 255 / 0.7);
+    animation: tour-pulse 1.8s ease-out infinite;
+  }
+  .tour-card {
+    position: fixed;
+    padding: 16px 16px 14px 18px;
+    border-radius: 22px;
+    background: var(--sheet-bg);
+    color: var(--label);
+    box-shadow: 0 24px 60px -18px rgb(0 0 0 / 0.55), inset 0 0 0 0.5px rgb(255 255 255 / 0.25);
+    animation: tour-card-in 0.42s cubic-bezier(0.3, 1.25, 0.5, 1) both;
+  }
+  .tour-caret {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    background: var(--sheet-bg);
+    transform: rotate(45deg);
+    border-radius: 3px;
+  }
+  .tour-card.is-below .tour-caret {
+    top: -6px;
+  }
+  .tour-card.is-above .tour-caret {
+    bottom: -6px;
+  }
+  .tour-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--fill);
+    transition: width 0.3s var(--ease-apple), background-color 0.3s ease;
+  }
+  .tour-dot.is-done {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .tour-dot.is-active {
+    width: 18px;
+    background: var(--accent);
+  }
+}
+@keyframes tour-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+@keyframes tour-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}

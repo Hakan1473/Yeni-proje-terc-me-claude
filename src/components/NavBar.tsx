@@ -16,7 +16,7 @@ export function NavBar({ onLanguages, onHistory, onSettings }: { onLanguages: ()
     <header className="relative z-20 pt-safe-nav shrink-0 select-none px-3 sm:px-5">
       <div className="glass h-[58px] rounded-[29px] flex items-center gap-2 pl-2.5 pr-2.5 sm:pl-3 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-2 min-w-0 sm:w-[220px]">
-          <button type="button" onClick={onHistory} aria-label="Geçmiş konuşmalar" title="Geçmiş konuşmalar" className="pressable icon-btn !w-10 !h-10 cursor-pointer sm:hidden">
+          <button type="button" onClick={onHistory} aria-label="Geçmiş konuşmalar" title="Geçmiş konuşmalar" data-tour="history" className="pressable icon-btn !w-10 !h-10 cursor-pointer sm:hidden">
             <Clock className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
           <div className="hidden sm:flex items-center gap-2.5 min-w-0">
@@ -37,6 +37,7 @@ export function NavBar({ onLanguages, onHistory, onSettings }: { onLanguages: ()
             onClick={onLanguages}
             className="pressable btn-gray h-10 pl-3 pr-2.5 rounded-full inline-flex items-center gap-2 text-[14px] font-semibold cursor-pointer min-w-0"
             title="Hastanın dilini değiştir"
+            data-tour="language"
           >
             <Flag iso="tr" label="Türkçe" size="xs" />
             <span className="hidden min-[400px]:inline">Türkçe</span>
@@ -48,7 +49,7 @@ export function NavBar({ onLanguages, onHistory, onSettings }: { onLanguages: ()
         </div>
 
         <div className="flex items-center justify-end gap-2 sm:w-[220px]">
-          <button type="button" onClick={onHistory} aria-label="Geçmiş konuşmalar" title="Geçmiş konuşmalar" className="pressable icon-btn !w-10 !h-10 cursor-pointer hidden sm:inline-flex">
+          <button type="button" onClick={onHistory} aria-label="Geçmiş konuşmalar" title="Geçmiş konuşmalar" data-tour="history" className="pressable icon-btn !w-10 !h-10 cursor-pointer hidden sm:inline-flex">
             <Clock className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
           <button
@@ -56,12 +57,13 @@ export function NavBar({ onLanguages, onHistory, onSettings }: { onLanguages: ()
             onClick={() => engine.newConversation()}
             disabled={!hasItems}
             aria-label="Yeni konuşma"
+            data-tour="new"
             title="Konuşmayı arşive kaydet ve yenisini başlat"
             className="pressable icon-btn !w-10 !h-10 cursor-pointer text-accent disabled:opacity-35 disabled:cursor-default"
           >
             <SquarePen className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
-          <button type="button" onClick={onSettings} aria-label="Ayarlar" title="Ayarlar" className="pressable icon-btn !w-10 !h-10 cursor-pointer">
+          <button type="button" onClick={onSettings} aria-label="Ayarlar" title="Ayarlar" data-tour="settings" className="pressable icon-btn !w-10 !h-10 cursor-pointer">
             <Settings className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
         </div>

@@ -21,6 +21,7 @@ export function DockKey({
   tone,
   disabled,
   pressed,
+  tour,
 }: {
   icon: DockIcon;
   label: string;
@@ -28,9 +29,11 @@ export function DockKey({
   tone?: 'danger' | 'accent';
   disabled?: boolean;
   pressed?: boolean;
+  /** Anchor for the live walkthrough. */
+  tour?: string;
 }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} className="dock-key cursor-pointer disabled:cursor-default">
+    <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} data-tour={tour} className="dock-key cursor-pointer disabled:cursor-default">
       <span className="dock-key-face">
         <Icon size={24} />
       </span>
@@ -63,19 +66,20 @@ export function Dock({ onType, onFaceToFace, onSummary }: { onType: () => void; 
       <div className="flex flex-col items-center px-3 pt-1">
         <Status />
         <nav aria-label="Tercüman kontrolleri" className="dock">
-          <DockKey icon={Keyboard} label="Yaz" onClick={onType} />
+          <DockKey icon={Keyboard} label="Yaz" onClick={onType} tour="type" />
           <DockKey
             icon={muted ? MicOff : Mic}
             label={muted ? 'Sessizde' : 'Sessiz'}
             tone={muted ? 'danger' : undefined}
             pressed={muted}
+            tour="mute"
             onClick={() => engine.setMuted(!muted)}
           />
-          <span className="dock-orb">
+          <span className="dock-orb" data-tour="orb">
             <Orb size={72} />
           </span>
-          <DockKey icon={Forum} label="Hastaya" onClick={onFaceToFace} />
-          <DockKey icon={ClinicalNotes} label="Özet" onClick={onSummary} disabled={!hasTurns} />
+          <DockKey icon={Forum} label="Hastaya" onClick={onFaceToFace} tour="face" />
+          <DockKey icon={ClinicalNotes} label="Özet" onClick={onSummary} disabled={!hasTurns} tour="summary" />
         </nav>
         <p className="pt-1 text-center text-[10.5px] leading-[14px] text-label-3">
           <span className="font-semibold text-sys-orange">Demo</span> · Hakan Karaarslan tarafından oluşturulmuştur

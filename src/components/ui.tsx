@@ -30,6 +30,8 @@ export interface Segment<T extends string> {
   id: T;
   label: ReactNode;
   badge?: ReactNode;
+  /** Anchor for the live walkthrough. */
+  tour?: string;
 }
 
 export function Segmented<T extends string>({
@@ -52,7 +54,15 @@ export function Segmented<T extends string>({
         style={{ width: `calc((100% - 6px) / ${items.length})`, transform: `translateX(${index * 100}%)` }}
       />
       {items.map((item) => (
-        <button key={item.id} type="button" role="tab" aria-selected={item.id === value} onClick={() => onChange(item.id)} className="segmented-item">
+        <button
+          key={item.id}
+          type="button"
+          role="tab"
+          aria-selected={item.id === value}
+          onClick={() => onChange(item.id)}
+          className="segmented-item"
+          data-tour={item.tour}
+        >
           <span className="truncate">{item.label}</span>
           {item.badge}
         </button>

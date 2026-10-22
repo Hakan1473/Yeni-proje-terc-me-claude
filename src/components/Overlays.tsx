@@ -1,6 +1,5 @@
-import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
+import { Check, CircleAlert, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
-import { LANGUAGES } from '../../shared/languages';
 import { TUTORIAL_VIDEOS } from '../../shared/tutorials';
 import type { TutorialKind, Turn } from '../../shared/types';
 import { checkAccess } from '../lib/api';
@@ -11,7 +10,7 @@ import { engine } from '../live/engine';
 import { VideoSources } from './Conversation';
 import { DockKey } from './Dock';
 import { Sync, Undo } from './icons';
-import { Orb, OrbArt } from './Orb';
+import { Orb } from './Orb';
 import { Flag, Sheet } from './ui';
 
 // ───────────────────────── Toast ─────────────────────────
@@ -189,139 +188,6 @@ export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => vo
         'text-label',
       )}
     </div>
-  );
-}
-
-// ───────────────────────── Onboarding ─────────────────────────
-
-const STEPS: { title: string; body: string; glyph: string; visual: ReactNode }[] = [
-  {
-    title: 'Hastanın dilini seçin',
-    body: 'Üstteki dil çubuğundan tek dokunuşla seçin; listede yoksa "Tüm Diller"den 60 dil arasında arayın. Seçim hatırlanır.',
-    glyph: 'bg-accent',
-    visual: (
-      <div className="flex flex-wrap justify-center gap-2">
-        {LANGUAGES.slice(0, 4).map((l, i) => (
-          <span key={l.code} className={`h-8 pl-2 pr-3 rounded-full inline-flex items-center gap-1.5 text-[13px] ${i === 0 ? 'bg-label text-bg font-semibold' : 'bg-surface shadow-card font-medium'}`}>
-            <Flag iso={l.flag} label={l.nameTr} size="xs" />
-            {l.nameTr.split(' ')[0]}
-          </span>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: 'Dokunun ve konuşun',
-    body: 'Mikrofona dokunduğunuzda canlı hat açılır. Türkçe konuşan personel, diğer dilde konuşan hasta olarak ayrılır; çeviri doğal bir sesle anında okunur.',
-    glyph: 'bg-sys-green',
-    visual: (
-      <OrbArt size={72} />
-    ),
-  },
-  {
-    title: 'Görüşmeyi durdurmadan dil değiştirin',
-    body: 'Hasta yakını başka bir dilde konuşursa yeni dile dokunun; hat kesilmeden geçiş yapılır, kayıtlar korunur.',
-    glyph: 'bg-sys-orange',
-    visual: (
-      <div className="flex items-center justify-center gap-3">
-        <Flag iso="gb" label="İngilizce" size="lg" />
-        <ArrowLeftRight className="w-5 h-5 text-label-3" strokeWidth={2.5} />
-        <Flag iso="sa" label="Arapça" size="lg" />
-      </div>
-    ),
-  },
-  {
-    title: 'Anamnez kendiliğinden oluşur',
-    body: 'Şikayetler, ilaçlar (dozuyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar ve istekler konuşurken ayrıştırılır. "Alerjim yok" gibi yanıtlar ayrı gösterilir. Yanlış bir maddeyi hastayla teyit edip sola kaydırarak silebilirsiniz.',
-    glyph: 'bg-sys-indigo',
-    visual: (
-      <div className="grid grid-cols-2 gap-2 text-left">
-        {[
-          ['Alerjiler', 'Penisilin', 'bg-sys-red'],
-          ['İlaçlar', 'Beloc (metoprolol) 50 mg', 'bg-sys-green'],
-          ['Şikayetler', 'Göğüs ağrısı (2 gündür)', 'bg-sys-pink'],
-          ['Kronik', 'Tip 2 diyabet', 'bg-sys-purple'],
-        ].map(([k, v, dot]) => (
-          <div key={k} className="rounded-[12px] bg-surface shadow-card px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-medium text-label-2">
-              <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-              {k}
-            </span>
-            <span className="block text-[13px] font-medium leading-snug">{v}</span>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: 'İlaç adları teyit edilir',
-    body: 'Hastanın söylediği ilaç adı ile çevirideki ad karşılaştırılır. Farklıysa kartta uyarı çıkar ve anamneze hastanın söylediği ad yazılır.',
-    glyph: 'bg-sys-red',
-    visual: (
-      <div className="rounded-[14px] bg-sys-red/10 px-4 py-3 text-[14px] text-left flex items-start gap-2">
-        <CircleAlert className="w-4 h-4 text-sys-red mt-0.5 shrink-0" strokeWidth={2.5} />
-        <span>
-          <b>İlaç adını teyit edin.</b> Hasta “Alipsa” dedi, çeviride “Eliquis” geçiyor.
-        </span>
-      </div>
-    ),
-  },
-  {
-    title: 'Videolu eğitim ve Hastaya Göster',
-    body: 'Çağrı butonunu veya Triflow cihazını anlattığınızda video kartı açılır. "Hastaya" düğmesi ekranı ikiye böler: üst yarı hastaya dönük büyük yazı gösterir.',
-    glyph: 'bg-sys-teal',
-    visual: (
-      <div className="mx-auto w-[150px] h-[110px] rounded-[16px] bg-surface shadow-card overflow-hidden flex flex-col">
-        <span className="flex-1 flex items-center justify-center rotate-180 text-[15px] font-semibold text-patient">Hello</span>
-        <span className="h-px bg-separator" />
-        <span className="flex-1 flex items-center justify-center text-[15px] font-semibold">Merhaba</span>
-      </div>
-    ),
-  },
-];
-
-export function Onboarding({ onClose }: { onClose: () => void }) {
-  const [i, setI] = useState(0);
-  const step = STEPS[i];
-  const last = i === STEPS.length - 1;
-  return (
-    <Sheet
-      onClose={onClose}
-      title={<span className="text-[13px] font-medium text-label-2">Hızlı Başlangıç · {i + 1}/{STEPS.length}</span>}
-      leading={
-        i > 0 ? (
-          <button type="button" onClick={() => setI(i - 1)} aria-label="Geri" className="pressable -ml-1 w-[30px] h-[30px] rounded-full bg-fill text-accent flex items-center justify-center cursor-pointer">
-            <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
-          </button>
-        ) : undefined
-      }
-      width="sm:max-w-md"
-      bodyClass="px-6 sm:px-8 pb-4"
-      footer={
-        <div className="w-full flex flex-col items-center gap-3 py-1">
-          <button type="button" onClick={() => (last ? onClose() : setI(i + 1))} className="pressable btn-primary w-full h-[50px] rounded-[14px] text-[17px] font-semibold cursor-pointer">
-            {last ? 'Başlayın' : 'Devam'}
-          </button>
-          <div className="flex items-center gap-2">
-            {STEPS.map((s, idx) => (
-              <button
-                key={s.title}
-                type="button"
-                onClick={() => setI(idx)}
-                aria-label={`Adım ${idx + 1}`}
-                className={`h-[7px] rounded-full transition-all duration-300 cursor-pointer ${idx === i ? 'w-[22px] bg-label' : 'w-[7px] bg-label-3'}`}
-              />
-            ))}
-          </div>
-        </div>
-      }
-    >
-      <div key={i} className="flex flex-col items-center text-center anim-rise">
-        <h2 className="mt-1 text-[26px] font-bold tracking-[-0.03em] leading-tight balance">{step.title}</h2>
-        <div className="w-full mt-6 rounded-[18px] bg-surface-2 dark:bg-surface-3/40 p-5">{step.visual}</div>
-        <p className="mt-5 text-[16px] text-label-2 leading-relaxed text-left pretty">{step.body}</p>
-      </div>
-    </Sheet>
   );
 }
 

@@ -14,7 +14,7 @@ Hemşire ve sağlık personeli için yabancı dildeki hastalarla **gerçek zaman
 - **İlaç adı teyidi**: hastanın söylediği ilaç ile çevirideki ilaç farklıysa kartta uyarı çıkar.
 - **Hastaya Göster**: ekranı ikiye bölen, üst yarısı hastaya dönük karşılıklı görünüm. Konuşma başlamadan hasta tarafında, seçilen dilde ne yapacağını anlatan bir açıklama gösterilir.
 - **Anında açılış**: ana ekrana eklenen uygulama önbellekten açılır (sunucu uyanmayı beklemez); iPhone'larda siyah ekran yerine açılış görseli gösterilir.
-- **Tanıtım filmi**: uygulama ilk kez açıldığında bir kez gösterilir (`public/videos/intro.mp4` / `.webm`); sonra Ayarlar → Rehber'den yeniden izlenebilir.
+- **Tanıtım filmi ve canlı rehber**: uygulama ilk kez açıldığında tanıtım filmi bir kez gösterilir (`public/videos/intro.mp4` / `.webm`), ardından canlı rehber başlar: ekran kararır, tanıtılan düğme aydınlanır ve yanında ne işe yaradığı yazar (başlat, dil, mikrofon, canlı konuşma, anamnez, hastaya göster, yaz, özet, yeni hasta, geçmiş, ayarlar). İkisi de Ayarlar → Kılavuz'dan yeniden açılabilir.
 - Çağrı butonu ve Triflow **eğitim videoları**, konuşma özeti, geçmiş (yalnızca cihazda), yazarak çeviri, açık/koyu/otomatik görünüm.
 
 ## Çalıştırma
