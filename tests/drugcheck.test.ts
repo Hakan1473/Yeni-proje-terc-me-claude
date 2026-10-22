@@ -16,14 +16,8 @@ describe('drug-name agreement', () => {
     expect(checkDrugNames('I use Coumadin.', 'Coumadin kullanıyorum.')).toEqual([]);
   });
 
-  it('flags a drug the translation invented, naming the unknown word that was said', () => {
-    const m = checkDrugNames('I take Xyzolin daily.', 'Her gün Eliquis alıyorum.');
-    expect(m[0].translated).toBe('Eliquis');
-    expect(m[0].said).toBe('Xyzolin');
-  });
-
-  it('does not judge non-Latin originals by spelling', () => {
-    expect(checkDrugNames('أتناول إليكويس', 'Eliquis kullanıyorum.')).toEqual([]);
+  it('does not flag a name the recogniser spelled oddly', () => {
+    expect(checkDrugNames('Yes, hypertension, diabetes, Bellocq, Avril, decort, Eliquis.', 'Evet, tansiyonum ve şeker hastalığım var. Beloc, Avil, Dekort ve Eliquis kullanıyorum.')).toEqual([]);
   });
 
   it('finds misheard names only in a medication context', () => {

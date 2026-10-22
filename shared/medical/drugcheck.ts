@@ -1,4 +1,3 @@
-import { fold } from '../text';
 import type { Fact, Speaker } from '../types';
 import { canonicalKey, drugIdentity, drugMentions } from './extract';
 
@@ -25,29 +24,6 @@ export interface DrugMismatch {
   translatedIdentity?: string;
 }
 
-// Capitalised words that are not drug names, so they are never offered as "what was said"
-const NOT_NAMES = new Set(
-  'i im ive id ill my me mr mrs ms dr doctor nurse yes no ok okay please thank thanks hello hi sorry and but so the a an monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december god english turkish'.split(
-    ' ',
-  ),
-);
-
-const isLatin = (text: string) => {
-  const letters = text.match(/\p{L}/gu) ?? [];
-  const latin = text.match(/\p{Script=Latin}/gu) ?? [];
-  return letters.length > 0 && latin.length / letters.length > 0.8;
-};
-
-/** Capitalised, name-like words that are not at the start of a sentence: likely the unknown drug. */
-function nameCandidates(text: string): string[] {
-  const out: string[] = [];
-  for (const m of text.matchAll(/(?<![.!?]\s*|^)(?<=\s)(\p{Lu}[\p{Ll}\p{Lu}-]{3,})/gu)) {
-    const w = m[1];
-    if (!NOT_NAMES.has(fold(w))) out.push(w);
-  }
-  return out;
-}
-
 export function checkDrugNames(source: string, translation: string): DrugMismatch[] {
   if (!source.trim() || !translation.trim()) return [];
   const said = drugMentions(source);
@@ -59,22 +35,12 @@ export function checkDrugNames(source: string, translation: string): DrugMismatc
   const onlyHeard = heard.filter((d) => !saidIds.has(d.identity));
   const out: DrugMismatch[] = [];
 
-  // One drug was said, another was translated: pair them up in order
+  // One recognised drug was said and a different one translated ("Alipsa" → "Eliquis").
+  // A name the recogniser spelled oddly ("Bellocq" for Beloc) is not a mismatch.
   while (onlySaid.length && onlyHeard.length) {
     const a = onlySaid.shift() as (typeof said)[number];
     const b = onlyHeard.shift() as (typeof heard)[number];
     out.push({ said: a.surface, saidLabel: a.label, saidIdentity: a.identity, translated: b.surface, translatedLabel: b.label, translatedIdentity: b.identity });
-  }
-  for (const b of onlyHeard) {
-    // The translation names a drug the speaker's words do not contain. Only judge
-    // Latin-script originals, where the same brand would be spelled alike.
-    if (!isLatin(source) || fold(source).includes(fold(b.surface))) continue;
-    const candidates = nameCandidates(source).filter((w) => !fold(translation).includes(fold(w)));
-    out.push({ said: candidates.length === 1 ? candidates[0] : undefined, translated: b.surface, translatedLabel: b.label, translatedIdentity: b.identity });
-  }
-  for (const a of onlySaid) {
-    if (fold(translation).includes(fold(a.surface))) continue;
-    out.push({ said: a.surface, saidLabel: a.label, saidIdentity: a.identity });
   }
   return out;
 }

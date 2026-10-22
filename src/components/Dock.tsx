@@ -10,7 +10,7 @@ const CAPTION: Record<SessionState, { title: string; tone: string }> = {
   listening: { title: 'Dinliyorum · Türkçe veya hasta dilinde konuşun', tone: 'var(--green)' },
   hearing: { title: 'Konuşma algılanıyor', tone: 'var(--green)' },
   translating: { title: 'Çevriliyor', tone: 'var(--accent)' },
-  speaking: { title: 'Seslendiriliyor · Geçmek için küreye dokunun', tone: 'var(--accent)' },
+  speaking: { title: 'Seslendiriliyor · Durdurmak için küreye dokunun', tone: 'var(--accent)' },
 };
 
 /** A key in the dock: a glass button with a filled glyph over a short label. */

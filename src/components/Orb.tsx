@@ -1,4 +1,4 @@
-import { AudioLines, LoaderCircle, Mic, MicOff } from 'lucide-react';
+import { LoaderCircle, Mic, MicOff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useStore } from '../lib/store';
 import { engine } from '../live/engine';
@@ -156,9 +156,9 @@ export function Orb({ size = 80 }: { size?: number }) {
 
   const active = session !== 'idle';
   const busy = session === 'connecting' || session === 'reconnecting';
-  const speaking = session === 'speaking';
-  const label = !active ? 'Tercümanı başlat' : speaking ? 'Seslendirmeyi geç' : 'Tercümanı durdur';
-  const onClick = () => (speaking ? engine.skipSpeech() : void engine.toggle());
+  const label = active ? 'Tercümanı durdur' : 'Tercümanı başlat';
+  // One meaning only: a tap while the interpreter talks also stops the session
+  const onClick = () => void engine.toggle();
   const icon = { width: size * 0.36, height: size * 0.36 };
   const stop = size * 0.27;
 
@@ -175,8 +175,6 @@ export function Orb({ size = 80 }: { size?: number }) {
       <span className="orb-glyph absolute inset-0 flex items-center justify-center pointer-events-none">
         {busy ? (
           <LoaderCircle key="busy" style={icon} className="animate-spin" strokeWidth={2.4} />
-        ) : speaking ? (
-          <AudioLines key="speak" style={icon} className="anim-glyph" strokeWidth={2.4} />
         ) : active ? (
           <span key="stop" style={{ width: stop, height: stop, borderRadius: stop * 0.3 }} className="block bg-current anim-glyph" />
         ) : muted ? (

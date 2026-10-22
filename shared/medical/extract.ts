@@ -456,7 +456,9 @@ export function extractFacts(u: Utterance, state: DialogueState): Fact[] {
     }
 
     // Conditions, family history, surgeries
-    const conditionHits = findHits(c, CONDITION_M);
+    // "tansiyonum ve şeker hastalığım var": the shared "var" belongs to every item of the list
+    const shared = family.length ? c : c.replace(/(\p{L}+(?:ım|im|um|üm))(\s+(?:ve|ile)\s+)(?=[^,.;]*\bvar\b)/gu, '$1 var$2');
+    const conditionHits = findHits(shared, CONDITION_M);
     const cancer = c.match(CANCER_RE);
     const familyEvents = family.length ? findHits(c, FAMILY_EVENT_M) : [];
     const diseaseLabels = [

@@ -330,13 +330,15 @@ export function mountRoutes(app: Express): void {
       return;
     }
     // Look the term up on the web first; model knowledge alone is the fallback
-    const grounded = await generateGroundedJson<Partial<TermInfo>>({
-      models: [config.models.smart, config.models.fast],
+    const found = await generateGroundedJson<Partial<TermInfo>>({
+      models: [config.models.fast, config.models.smart],
       system: termInstruction,
       input: { term, kind },
-      timeoutMs: 14000,
+      timeoutMs: 12000,
       temperature: 0.1,
     });
+    // A search that found nothing still gets a second opinion from the model's own knowledge
+    const grounded = found && found.data.known !== false && cleanString(found.data.summary, 400) ? found : null;
     const out =
       grounded?.data ??
       (await generateJson<Partial<TermInfo>>({

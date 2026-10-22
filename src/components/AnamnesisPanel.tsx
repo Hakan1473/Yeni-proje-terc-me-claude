@@ -222,9 +222,6 @@ function FactRow({
             <Trash2 className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
-        {fact.verify && (
-          <p className="-mt-1.5 pl-4 pr-4 pb-2.5 text-[12.5px] text-sys-orange leading-snug">{fact.verify}</p>
-        )}
         {open && fact.evidence && (
           <p dir="auto" className="-mt-1 pl-4 pr-4 pb-2.5 text-[13px] italic text-label-2 leading-snug anim-fade">
             “{fact.evidence}”
@@ -232,6 +229,26 @@ function FactRow({
         )}
       </div>
     </li>
+  );
+}
+
+/** One note for the whole drug list, plus the names that differed between speech and translation. */
+function VerifyDrugs({ facts }: { facts: Fact[] }) {
+  const flagged = facts.filter((f) => f.verify);
+  return (
+    <div className="mx-3 mb-3 mt-1 rounded-[12px] bg-sys-orange/10 px-3 py-2.5 flex items-start gap-2">
+      <TriangleAlert className="w-4 h-4 text-sys-orange shrink-0 mt-px" strokeWidth={2.25} />
+      <div className="min-w-0 text-[13px] leading-snug">
+        <p>
+          <span className="font-semibold">İlaçları hastayla teyit edin.</span> <span className="text-label-2">Ad ve dozları uygulamadan önce doğrulayın.</span>
+        </p>
+        {flagged.map((f) => (
+          <p key={f.key} className="mt-1 text-sys-orange">
+            {f.verify}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -361,6 +378,7 @@ export function AnamnesisPanel() {
                       );
                     })}
                   </ul>
+                  {category === 'medication' && count > 0 && <VerifyDrugs facts={list} />}
                 </section>
               );
             })}

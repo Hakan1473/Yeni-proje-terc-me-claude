@@ -37,7 +37,9 @@ function persist(key: string, info: TermInfo) {
 /** A card already on this device, so it can open without a spinner. */
 export function cachedTerm(q: TermQuery): TermInfo | null {
   const hit = stored[termKey(q)];
-  return hit && Date.now() - hit.at < TTL ? hit.info : null;
+  // A simulation sample is never a real answer
+  if (!hit || hit.info.origin === 'demo' || hit.info.summary?.startsWith('Simülasyon modunda')) return null;
+  return Date.now() - hit.at < TTL ? hit.info : null;
 }
 
 /** Card for a term: device cache first, one request in flight per term. */
@@ -71,11 +73,14 @@ export function prefetchTerms(list: TermQuery[]) {
   }
   if (draining) return;
   draining = true;
-  void (async () => {
+  // Two lookups at a time: web search takes a few seconds per term
+  const worker = async () => {
     while (queue.length) {
       const q = queue.shift() as TermQuery;
       await fetchTerm(q).catch(() => {});
     }
+  };
+  void Promise.all([worker(), worker()]).then(() => {
     draining = false;
-  })();
+  });
 }

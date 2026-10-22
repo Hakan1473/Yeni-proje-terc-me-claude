@@ -201,6 +201,11 @@ class Engine {
     this.live.open({ lang: language.code, voice, pace });
     try {
       await this.mic.start();
+      // Stopped while the microphone was starting: release it and stay stopped
+      if (!this.active) {
+        await this.mic.stop();
+        return;
+      }
       this.mic.setMuted(this.store.get().muted);
     } catch (err) {
       const denied = (err as DOMException)?.name === 'NotAllowedError' || (err as DOMException)?.name === 'SecurityError';
@@ -225,6 +230,9 @@ class Engine {
     this.live.close();
     await this.mic.stop();
     speaker.stop();
+    // A spoken reply still being fetched must not start after Stop
+    this.store.set({ playingTurnId: null });
+    this.lateLiveUntil = 0;
     this.stopLevelLoop();
     void this.wakeLock?.release().catch(() => {});
     this.wakeLock = null;
@@ -244,11 +252,6 @@ class Engine {
     this.store.set({ muted });
     this.mic.setMuted(muted);
     if (muted && this.active) this.live.endAudio();
-  }
-
-  /** Tap on the orb while the interpreter talks: stop the voice, keep the session. */
-  skipSpeech() {
-    speaker.stop();
   }
 
   private setSession(session: SessionState) {

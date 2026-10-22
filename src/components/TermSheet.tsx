@@ -26,7 +26,9 @@ function useTerm(q: TermQuery) {
   const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
+    // One quiet retry before showing an error: a web lookup can fail on a slow network
     fetchTerm(q)
+      .catch(() => fetchTerm(q))
       .then(setInfo)
       .catch(() => setFailed(true));
   }, [q]);
@@ -39,6 +41,10 @@ function useTerm(q: TermQuery) {
 function Skeleton() {
   return (
     <div className="space-y-5 pt-1" aria-label="Yükleniyor">
+      <p className="flex items-center gap-2 text-[14px] font-medium">
+        <Globe className="w-4 h-4 text-accent animate-pulse" strokeWidth={2.2} />
+        <span className="shimmer-text">İnternette araştırılıyor…</span>
+      </p>
       <div className="space-y-2.5">
         <div className="skeleton h-[18px] w-[94%]" />
         <div className="skeleton h-[18px] w-[78%]" />
