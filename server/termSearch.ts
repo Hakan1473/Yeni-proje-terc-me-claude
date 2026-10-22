@@ -223,7 +223,7 @@ function findDrug(term: string) {
   );
 }
 
-const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
+const cap = (s?: string) => (s ? s.charAt(0).toLocaleUpperCase('tr') + s.slice(1) : undefined);
 
 // Drug groups recognisable with certainty from the active ingredient's ending
 const CLASS_BY_SUFFIX: [RegExp, string][] = [
@@ -379,7 +379,7 @@ export function referenceCard(term: string, kind: TermKind, type: CardType, cate
       firstSentence ?? `${drug.name}${drug.generic ? `, etken maddesi ${drug.generic} olan bir ilaçtır.` : ' bir ilaçtır.'}${group ? ` ${group} grubundadır.` : ''}`;
     return { ...base, summary, activeIngredient: cap(drug.generic), drugClass: group };
   }
-  if (firstSentence) return { ...base, summary: firstSentence };
+  if (extract) return { ...base, summary: extract.extract.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ') };
   return null;
 }
 
@@ -435,8 +435,10 @@ async function encyclopedia(term: string, type: CardType): Promise<WebResult | n
  * Build the card for a term. Returns null when nothing verified can be said
  * (the AI is unreachable and the term is not in the reference data).
  */
-export async function researchTermCard(term: string, kind: TermKind, category?: FactCategory): Promise<TermInfo | null> {
+export async function researchTermCard(term: string, kind: TermKind, category?: FactCategory, useAi = true): Promise<TermInfo | null> {
   const type = cardTypeOf({ kind, category });
+  // Without an API key there is still the encyclopedia and the verified reference data
+  if (!useAi) return referenceCard(term, kind, type, category, await encyclopedia(term, type));
   const drug = findDrug(term);
   const system = `${COMMON}\n\n${BY_TYPE[type]}`;
   const input = {

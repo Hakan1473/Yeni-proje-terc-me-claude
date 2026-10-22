@@ -333,8 +333,8 @@ export function TermSheet({
         {info?.origin === 'web' ? <Globe className="w-3.5 h-3.5 shrink-0" strokeWidth={2} /> : <Sparkles className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />}
         {info?.origin === 'web'
           ? 'İnternet kaynaklarıyla doğrulanmış yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'
-          : info?.origin === 'demo'
-            ? 'Simülasyon örneği · Gerçek bilgi değildir'
+          : info?.origin === 'reference'
+            ? 'Ansiklopedi ve doğrulanmış temel bilgi · Klinik karar ve prospektüs yerine geçmez'
             : 'Yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'}
       </p>
       )}

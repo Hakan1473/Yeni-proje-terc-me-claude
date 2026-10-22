@@ -1,7 +1,5 @@
-import { cardTypeOf, type TermInfo, type TermKind } from '../shared/medical/terms';
 import { classifySpeaker } from '../shared/speaker';
-import { fold } from '../shared/text';
-import type { FactCategory, Language, Speaker } from '../shared/types';
+import type { Language, Speaker } from '../shared/types';
 import { pcmToWav } from './ai';
 
 /**
@@ -72,73 +70,3 @@ export function mockSpeech(text: string): string {
 }
 
 // Reference cards for the terms the demo conversation produces
-const MOCK_TERMS: (Omit<TermInfo, 'term' | 'kind' | 'known'> & { match: string })[] = [
-  {
-    match: 'beloc',
-    summary: 'Kalp hızını ve kan basıncını düşüren bir ilaçtır. Kalbin iş yükünü azaltır.',
-    activeIngredient: 'Metoprolol süksinat',
-    drugClass: 'Beta bloker',
-    points: ['Hipertansiyon', 'Angina pektoris', 'Kalp ritim bozuklukları'],
-    nursing: ['Uygulamadan önce nabız ve tansiyon ölçülmeli', 'Nabız 50/dk altındaysa hekime bildirilmeli', 'Ani bırakılmamalı'],
-  },
-  {
-    match: 'penisilin',
-    summary: 'Bakteriyel enfeksiyonların tedavisinde kullanılan beta-laktam grubu bir antibiyotiktir.',
-    activeIngredient: 'Benzilpenisilin',
-    drugClass: 'Beta-laktam antibiyotik',
-    points: ['Boğaz enfeksiyonları', 'Sifiliz', 'Romatizmal ateş profilaksisi'],
-    nursing: ['Alerjide anafilaksi riski: tüm penisilin türevlerinden kaçınılmalı', 'Sefalosporinlerle çapraz reaksiyon olabilir', 'Alerji bilekliği takılmalı'],
-  },
-  {
-    match: 'hipertansiyon',
-    summary: 'Kan basıncının sürekli olarak 140/90 mmHg ve üzerinde seyretmesidir. Kalp, beyin ve böbrek hastalıkları için önemli bir risk etkenidir.',
-    points: ['Çoğu zaman belirti vermez', 'Baş ağrısı, ense ağrısı', 'Baş dönmesi, burun kanaması'],
-    nursing: ['Tansiyon düzenli aralıklarla izlenmeli', '180/110 üzeri değerler hekime bildirilmeli', 'Tuz kısıtlaması hatırlatılmalı'],
-  },
-  {
-    match: 'tip 2 diyabet',
-    summary: 'Vücudun insüline yeterli yanıt verememesi sonucu kan şekerinin yükseldiği kronik bir metabolizma hastalığıdır.',
-    points: ['Çok su içme, sık idrara çıkma', 'Yorgunluk', 'Yaraların geç iyileşmesi'],
-    nursing: ['Kan şekeri takibi yapılmalı', 'Hipoglisemi belirtileri izlenmeli', 'Ayak bakımı ve cilt bütünlüğü kontrol edilmeli'],
-  },
-  {
-    match: 'gogus agrisi',
-    summary: 'Göğüs bölgesinde hissedilen ağrıdır. Kalp, akciğer, kas-iskelet veya sindirim sistemi kaynaklı olabilir.',
-    points: ['Baskı, sıkışma veya yanma hissi', 'Kola, çeneye, sırta yayılabilir', 'Terleme, nefes darlığı eşlik edebilir'],
-    nursing: ['Hemen EKG çekilmeli ve vital bulgular alınmalı', 'Ağrının yeri, süresi ve yayılımı sorulmalı', 'Hekime ivedi bildirilmeli'],
-  },
-  {
-    match: 'bas donmesi',
-    summary: 'Dengesizlik, sersemlik veya çevrenin dönüyormuş gibi hissedilmesidir.',
-    points: ['Sersemlik, bayılacak gibi olma', 'Dengesizlik', 'Bulantı eşlik edebilir'],
-    nursing: ['Düşme riskine karşı önlem alınmalı', 'Tansiyon ve kan şekeri kontrol edilmeli', 'Ayağa kalkarken yardım edilmeli'],
-  },
-];
-
-const MOCK_PENICILLIN_ALLERGY: Omit<TermInfo, 'term' | 'kind' | 'known'> = {
-  summary: 'Penisilin grubu beta-laktam antibiyotiklere alerji. Aynı halka yapısını taşıyan diğer antibiyotiklerle çapraz reaksiyon görülebilir.',
-  drugClass: 'Beta-laktam antibiyotikler',
-  crossReactions: ['Amoksisilin (Augmentin, Largopen) — yüksek risk', 'Ampisilin (Alfasilin) — yüksek risk', 'Sefalosporinler (Sefazolin, Seftriakson) — düşük-orta risk'],
-  avoidList: ['Penisilin içeren kombinasyon preparatları'],
-  reactionSigns: ['Kurdeşen, kaşıntı', 'Dudak ve dilde şişlik', 'Hırıltı, nefes darlığı', 'Tansiyon düşmesi (anafilaksi)'],
-  nursing: ['Alerji bilekliği takılmalı', 'Antibiyotik orderları hekimle kontrol edilmeli', 'Acil set hazır olmalı'],
-};
-
-export function mockTerm(term: string, kind: TermKind, category?: FactCategory): TermInfo {
-  const f = fold(term);
-  if (cardTypeOf({ kind, category }) === 'allergy' && f.includes('penisilin')) {
-    return { term, kind, category, known: true, origin: 'demo', ...MOCK_PENICILLIN_ALLERGY };
-  }
-  const hit = MOCK_TERMS.find((t) => f.includes(t.match));
-  if (hit) {
-    const { match: _match, ...card } = hit;
-    return { term, kind, known: true, origin: 'demo', ...card };
-  }
-  return {
-    term,
-    kind,
-    known: true,
-    origin: 'demo',
-    summary: 'Simülasyon modunda bu terim için örnek bilgi yok. Gerçek API anahtarıyla yapay zekâ burada internetten doğrulanmış kısa bir açıklama gösterir.',
-  };
-}

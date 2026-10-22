@@ -11,7 +11,7 @@ import type { AnamnesisRequest, ConversationSummary, Fact, FactCategory, Speaker
 import { VOICES } from '../shared/types';
 import { generateJson, synthesize } from './ai';
 import { config } from './config';
-import { mockSpeech, mockTerm, mockTranslate } from './mock';
+import { mockSpeech, mockTranslate } from './mock';
 import { anamnesisInstruction, summaryInstruction, translateInstruction } from './prompts';
 import { cleanString, hasAccess, rateLimit, requireAccess } from './security';
 import { researchTermCard } from './termSearch';
@@ -329,12 +329,8 @@ export function mountRoutes(app: Express): void {
       res.json(cached);
       return;
     }
-    if (config.mock) {
-      res.json(mockTerm(term, kind, category));
-      return;
-    }
     try {
-      const info = await researchTermCard(term, kind, category);
+      const info = await researchTermCard(term, kind, category, !config.mock);
       if (!info) {
         // Nothing verified to show: the card offers a retry instead of filler text
         res.status(503).json({ error: 'term_unavailable' });
