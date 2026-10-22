@@ -1,7 +1,7 @@
 import { Play, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-export const INTRO_VIDEO = { src: '/videos/intro.mp4', poster: '/videos/intro-poster.jpg', length: '1:42' };
+export const INTRO_VIDEO = { mp4: '/videos/intro.mp4', webm: '/videos/intro.webm', poster: '/videos/intro-poster.jpg', length: '1:42' };
 
 /**
  * The product introduction, shown once on first launch (and again on request
@@ -50,14 +50,16 @@ export function IntroVideo({ onClose }: { onClose: () => void }) {
           {/* biome-ignore lint/a11y/useMediaCaption: narrated product tour; the same content is in the quick-start guide */}
           <video
             ref={video}
-            src={INTRO_VIDEO.src}
             poster={INTRO_VIDEO.poster}
             preload="metadata"
             playsInline
             controls={started}
             onEnded={() => window.setTimeout(onClose, 600)}
             className="absolute inset-0 w-full h-full object-contain"
-          />
+          >
+            <source src={INTRO_VIDEO.mp4} type="video/mp4" />
+            <source src={INTRO_VIDEO.webm} type="video/webm" />
+          </video>
           {!started && (
             // The key sits on the poster's sphere, clear of the title below it
             <button type="button" onClick={play} className="intro-play absolute inset-0 cursor-pointer" aria-label="Tanıtım videosunu oynat">

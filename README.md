@@ -13,6 +13,7 @@ Hemşire ve sağlık personeli için yabancı dildeki hastalarla **gerçek zaman
 - **Tıbbi bilgi kartı**: anamnezdeki ilaca, hastalığa veya belirtiye dokunulduğunda kısa bir kart açılır: ne olduğu, etken madde, ilaç grubu ve hemşirenin dikkat etmesi gerekenler. Kartlar arka planda önceden hazırlanır ve cihazda saklanır, bu yüzden anında açılır.
 - **Sayı tutarlılık denetimi**: "500 mg" çeviride "50 mg" olursa uyarır.
 - **Hastaya Göster**: ekranı ikiye bölen, üst yarısı hastaya dönük karşılıklı görünüm. Konuşma başlamadan hasta tarafında, seçilen dilde ne yapacağını anlatan bir açıklama gösterilir.
+- **Tanıtım filmi**: uygulama ilk kez açıldığında bir kez gösterilir (`public/videos/intro.mp4` / `.webm`); sonra Ayarlar → Rehber'den yeniden izlenebilir.
 - Çağrı butonu ve Triflow **eğitim videoları**, konuşma özeti, geçmiş (yalnızca cihazda), yazarak çeviri, açık/koyu/otomatik görünüm.
 
 ## Çalıştırma
