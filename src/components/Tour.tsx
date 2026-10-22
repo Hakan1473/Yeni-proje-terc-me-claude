@@ -73,31 +73,74 @@ const STEPS: Step[] = [
   },
 ];
 
-const PAD = 8;
 const GAP = 14;
 const CARD_W = 320;
 
-/** The visible element for a step (several may exist, e.g. phone and desktop layouts). */
-function findTarget(name: string): HTMLElement | null {
-  for (const el of document.querySelectorAll<HTMLElement>(`[data-tour="${name}"]`)) {
+interface Shape {
+  rect: DOMRect;
+  /** Corner radii: top-left, top-right, bottom-right, bottom-left. */
+  radii: [number, number, number, number];
+}
+
+/**
+ * The visible elements for a step. Phone and desktop layouts may each have one;
+ * a desktop pane is its header and its body together.
+ */
+function findTargets(name: string): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${name}"]`)).filter((el) => {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight) return el;
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
+  });
+}
+
+function cornerRadii(el: Element, rect: DOMRect): [number, number, number, number] {
+  const cs = getComputedStyle(el);
+  const max = Math.min(rect.width, rect.height) / 2;
+  const px = (v: string) => {
+    const n = Number.parseFloat(v) || 0;
+    return Math.min(max, v.endsWith('%') ? (n / 100) * Math.min(rect.width, rect.height) : n);
+  };
+  return [px(cs.borderTopLeftRadius), px(cs.borderTopRightRadius), px(cs.borderBottomRightRadius), px(cs.borderBottomLeftRadius)];
+}
+
+/**
+ * The exact outline of what is being explained: the control's visible shape
+ * (a dock key's circle, not its label) with its own corner radii. A pane inside
+ * a card takes the card's rounded corners where it touches them.
+ */
+function shapeOf(targets: HTMLElement[]): Shape {
+  const parts = targets.map((t) => t.querySelector<HTMLElement>('[data-tour-shape]') ?? t);
+  const el = parts[0];
+  const rects = parts.map((p) => p.getBoundingClientRect());
+  const left = Math.min(...rects.map((r) => r.left));
+  const top = Math.min(...rects.map((r) => r.top));
+  const rect = new DOMRect(left, top, Math.max(...rects.map((r) => r.right)) - left, Math.max(...rects.map((r) => r.bottom)) - top);
+  const radii: Shape['radii'] = parts.length === 1 ? cornerRadii(el, rect) : [0, 0, 0, 0];
+  const near = (a: number, b: number) => Math.abs(a - b) < 2;
+  let parent = el.parentElement;
+  for (let depth = 0; parent && depth < 4; depth++, parent = parent.parentElement) {
+    const pr = parent.getBoundingClientRect();
+    const [tl, tr, br, bl] = cornerRadii(parent, pr);
+    if (!radii[0] && near(pr.left, rect.left) && near(pr.top, rect.top)) radii[0] = tl;
+    if (!radii[1] && near(pr.right, rect.right) && near(pr.top, rect.top)) radii[1] = tr;
+    if (!radii[2] && near(pr.right, rect.right) && near(pr.bottom, rect.bottom)) radii[2] = br;
+    if (!radii[3] && near(pr.left, rect.left) && near(pr.bottom, rect.bottom)) radii[3] = bl;
   }
-  return null;
+  return { rect, radii };
 }
 
 export function Tour({ onClose }: { onClose: () => void }) {
-  const [steps] = useState(() => STEPS.filter((s) => findTarget(s.target)));
+  const [steps] = useState(() => STEPS.filter((s) => findTargets(s.target).length > 0));
   const [index, setIndex] = useState(0);
-  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [shape, setShape] = useState<Shape | null>(null);
   const [view, setView] = useState({ w: window.innerWidth, h: window.innerHeight });
   const step = steps[index];
   const last = index === steps.length - 1;
 
   const measure = useCallback(() => {
     setView({ w: window.innerWidth, h: window.innerHeight });
-    const el = step && findTarget(step.target);
-    setRect(el ? el.getBoundingClientRect() : null);
+    const els = step ? findTargets(step.target) : [];
+    setShape(els.length ? shapeOf(els) : null);
   }, [step]);
 
   useLayoutEffect(() => {
@@ -128,11 +171,14 @@ export function Tour({ onClose }: { onClose: () => void }) {
     if (steps.length === 0) onClose();
   }, [steps.length, onClose]);
 
-  if (!step || !rect) return null;
+  if (!step || !shape) return null;
 
-  // Spotlight: the target with a little air, rounded like the control itself
-  const hole = { x: rect.left - PAD, y: rect.top - PAD, w: rect.width + PAD * 2, h: rect.height + PAD * 2 };
-  const radius = Math.min(hole.h / 2, 26);
+  // Spotlight: exactly the control's outline; small controls get a thin margin of light
+  // that keeps their shape (a circle stays a circle), large panes none
+  const { rect, radii } = shape;
+  const pad = Math.min(rect.width, rect.height) > 120 ? 0 : 5;
+  const hole = { x: rect.left - pad, y: rect.top - pad, w: rect.width + pad * 2, h: rect.height + pad * 2 };
+  const borderRadius = radii.map((r) => `${r ? r + pad : 0}px`).join(' ');
   // Callout below or above the target (whichever has room); beside a tall target such as a pane
   const cardW = Math.min(CARD_W, view.w - 32);
   const roomBelow = view.h - (hole.y + hole.h);
@@ -157,7 +203,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
     <div className="tour" role="dialog" aria-modal="true" aria-labelledby="tour-title">
       {/* Clicks never reach the app during the tour */}
       <div className="absolute inset-0" />
-      <div className="tour-spotlight" style={{ left: hole.x, top: hole.y, width: hole.w, height: hole.h, borderRadius: radius }} />
+      <div className="tour-spotlight" style={{ left: hole.x, top: hole.y, width: hole.w, height: hole.h, borderRadius }} />
       <div key={index} className={`tour-card ${placement}`} style={{ left, width: cardW, ...position }}>
         {vertical && <span className="tour-caret" style={{ left: caret }} aria-hidden="true" />}
         <div className="flex items-start justify-between gap-3">

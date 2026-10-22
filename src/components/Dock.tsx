@@ -34,7 +34,7 @@ export function DockKey({
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} data-tour={tour} className="dock-key cursor-pointer disabled:cursor-default">
-      <span className="dock-key-face">
+      <span className="dock-key-face" data-tour-shape>
         <Icon size={24} />
       </span>
       <span className="dock-key-label">{label}</span>

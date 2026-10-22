@@ -157,16 +157,18 @@ export default function App() {
           {wide ? (
             <>
               <div className="hairline-b grid grid-cols-2 shrink-0">
-                <PaneHeader
-                  icon={
-                    <span className="glyph w-6 h-6 rounded-[7px] bg-accent">
-                      <MessagesSquare className="w-3.5 h-3.5" strokeWidth={2.25} />
-                    </span>
-                  }
-                  title="Canlı Konuşma"
-                  meta={turnCount ? `${turnCount} konuşma` : undefined}
-                />
-                <div className="hairline-l">
+                <div data-tour="conversation">
+                  <PaneHeader
+                    icon={
+                      <span className="glyph w-6 h-6 rounded-[7px] bg-accent">
+                        <MessagesSquare className="w-3.5 h-3.5" strokeWidth={2.25} />
+                      </span>
+                    }
+                    title="Canlı Konuşma"
+                    meta={turnCount ? `${turnCount} konuşma` : undefined}
+                  />
+                </div>
+                <div className="hairline-l" data-tour="anamnesis">
                   <PaneHeader
                     icon={
                       <span className="glyph w-6 h-6 rounded-[7px] bg-sys-indigo">

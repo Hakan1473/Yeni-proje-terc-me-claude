@@ -171,6 +171,7 @@ export function Orb({ size = 80 }: { size?: number }) {
       onClick={onClick}
       aria-label={label}
       title={label}
+      data-tour-shape
       className="orb relative shrink-0 rounded-full cursor-pointer transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.94]"
       style={{ width: size, height: size }}
     >
