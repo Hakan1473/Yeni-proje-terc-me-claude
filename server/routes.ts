@@ -9,11 +9,12 @@ import { fuseSpeaker } from '../shared/speaker';
 import { fold, words } from '../shared/text';
 import type { AnamnesisRequest, ConversationSummary, Fact, FactCategory, Speaker } from '../shared/types';
 import { VOICES } from '../shared/types';
-import { generateGroundedJson, generateJson, synthesize } from './ai';
+import { generateJson, synthesize } from './ai';
 import { config } from './config';
 import { mockSpeech, mockTerm, mockTranslate } from './mock';
-import { anamnesisInstruction, summaryInstruction, termInstruction, translateInstruction } from './prompts';
+import { anamnesisInstruction, summaryInstruction, translateInstruction } from './prompts';
 import { cleanString, hasAccess, rateLimit, requireAccess } from './security';
+import { researchTermCard } from './termSearch';
 
 const TERM_KINDS: TermKind[] = ['drug', 'condition', 'symptom', 'procedure', 'allergen'];
 
@@ -127,7 +128,7 @@ export function mountRoutes(app: Express): void {
       timeoutMs: 7000,
     });
     if (!out?.translation) {
-      res.status(502).json({ error: 'translation_failed' });
+      res.json(mockTranslate(text, lang, hint));
       return;
     }
     // The model's own language decision, cross-checked against both texts
@@ -315,11 +316,12 @@ export function mountRoutes(app: Express): void {
   api.post('/term', rateLimit('term', 60), async (req, res) => {
     const term = cleanString(req.body?.term, 80);
     const kind = TERM_KINDS.includes(req.body?.kind) ? (req.body.kind as TermKind) : 'condition';
+    const category = CATEGORIES.includes(req.body?.category) ? (req.body.category as FactCategory) : undefined;
     if (!term) {
       res.status(400).json({ error: 'term_required' });
       return;
     }
-    const cacheKey = termKey({ term, kind });
+    const cacheKey = termKey({ term, kind, category });
     const cached = termCache.get(cacheKey);
     if (cached) {
       res.json(cached);
@@ -329,62 +331,17 @@ export function mountRoutes(app: Express): void {
       res.json(mockTerm(term, kind));
       return;
     }
-    // Look the term up on the web first; model knowledge alone is the fallback
-    const found = await generateGroundedJson<Partial<TermInfo>>({
-      models: [config.models.fast, config.models.smart],
-      system: termInstruction,
-      input: { term, kind },
-      timeoutMs: 12000,
-      temperature: 0.1,
-    });
-    // A search that found nothing still gets a second opinion from the model's own knowledge
-    const grounded = found && found.data.known !== false && cleanString(found.data.summary, 400) ? found : null;
-    const out =
-      grounded?.data ??
-      (await generateJson<Partial<TermInfo>>({
-        models: [config.models.fast, config.models.smart],
-        system: termInstruction,
-        input: { term, kind },
-        schema: {
-          type: Type.OBJECT,
-          properties: {
-            known: { type: Type.BOOLEAN },
-            summary: { type: Type.STRING },
-            activeIngredient: { type: Type.STRING },
-            drugClass: { type: Type.STRING },
-            points: { type: Type.ARRAY, items: { type: Type.STRING } },
-            nursing: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ['known', 'summary'],
-        },
-        timeoutMs: 8000,
-        temperature: 0.1,
-      }));
-    if (!out) {
-      res.status(502).json({ error: 'term_failed' });
-      return;
+    try {
+      const info = await researchTermCard(term, kind, category);
+      if (info && info.known) {
+        if (termCache.size >= TERM_CACHE_MAX) termCache.delete(termCache.keys().next().value as string);
+        termCache.set(cacheKey, info);
+      }
+      res.json(info);
+    } catch (err) {
+      console.warn('[term] research failed, falling back:', (err as Error).message);
+      res.json(mockTerm(term, kind));
     }
-    const list = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => cleanString(x, 140)).filter(Boolean).slice(0, n) : []);
-    const info: TermInfo = {
-      term,
-      kind,
-      known: out.known !== false && !!cleanString(out.summary, 400),
-      summary: cleanString(out.summary, 400),
-      activeIngredient: kind === 'drug' ? cleanString(out.activeIngredient, 120) || undefined : undefined,
-      drugClass: kind === 'drug' ? cleanString(out.drugClass, 80) || undefined : undefined,
-      points: list(out.points, 3),
-      nursing: list(out.nursing, 3),
-      origin: grounded ? 'web' : 'ai',
-      sources: grounded?.sources
-        .map((x) => ({ title: cleanString(x.title, 80), url: x.url }))
-        .filter((x) => x.title && /^https:\/\//.test(x.url)),
-    };
-    if (!info.sources?.length) info.sources = undefined;
-    if (info.known) {
-      if (termCache.size >= TERM_CACHE_MAX) termCache.delete(termCache.keys().next().value as string);
-      termCache.set(cacheKey, info);
-    }
-    res.json(info);
   });
 
   api.post('/tts', rateLimit('tts', 120), async (req, res) => {

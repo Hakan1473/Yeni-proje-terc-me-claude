@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, type Schema } from '@google/genai';
+import { GoogleGenAI, Modality, type Schema, ThinkingLevel } from '@google/genai';
 import { config } from './config';
 
 export const ai = new GoogleGenAI({
@@ -32,11 +32,23 @@ interface JsonRequest {
   temperature?: number;
 }
 
+/** Models that returned 429 / RESOURCE_EXHAUSTED: avoid retrying them until cooldown expires. */
+const quotaCooldown = new Map<string, number>();
+
 /** Structured generation with a per-model timeout and a model fallback chain. */
 export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
-  for (const model of req.models) {
+  const models = Array.from(new Set(req.models));
+  const timeoutMs = Math.max(req.timeoutMs, 14000);
+  const now = Date.now();
+
+  for (const model of models) {
+    const cooledUntil = quotaCooldown.get(model);
+    if (cooledUntil && now < cooledUntil) {
+      continue;
+    }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), req.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await ai.models.generateContent({
         model,
@@ -45,14 +57,20 @@ export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
           systemInstruction: req.system,
           responseMimeType: 'application/json',
           responseSchema: req.schema,
-          temperature: req.temperature ?? 0.2,
+          temperature: req.temperature ?? 0.1,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
           abortSignal: controller.signal,
         },
       });
       const parsed = parseJson<T>(res.text);
       if (parsed) return parsed;
     } catch (err) {
-      console.warn(`[ai] ${model} failed:`, (err as Error).message);
+      const msg = (err as Error).message || '';
+      console.warn(`[ai] ${model} failed:`, msg);
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+        // Cooldown for 5 minutes so we don't spam an exhausted quota
+        quotaCooldown.set(model, Date.now() + 5 * 60 * 1000);
+      }
     } finally {
       clearTimeout(timer);
     }

@@ -28,7 +28,16 @@ async function main() {
     app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
   } else {
     const { createServer } = await import('vite');
-    const vite = await createServer({ root, server: { middlewareMode: true }, appType: 'spa' });
+    const disableHmr = process.env.DISABLE_HMR === 'true';
+    const vite = await createServer({
+      root,
+      server: {
+        middlewareMode: true,
+        ws: disableHmr ? false : { server },
+        hmr: disableHmr ? false : { server },
+      },
+      appType: 'spa',
+    });
     app.use(vite.middlewares);
   }
 

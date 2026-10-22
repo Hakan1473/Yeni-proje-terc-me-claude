@@ -5,7 +5,7 @@ import { DRUGS } from './lexicon';
 /** What a term card describes. Decides which fields the card shows. */
 export type TermKind = 'drug' | 'condition' | 'symptom' | 'procedure' | 'allergen';
 
-/** Short reference card for a medical term in the anamnesis. */
+/** Short reference card for a medical term in the anamnesis or summary. */
 export interface TermInfo {
   term: string;
   kind: TermKind;
@@ -16,8 +16,16 @@ export interface TermInfo {
   drugClass?: string;
   /** Typical uses (drugs) or typical signs (conditions, symptoms). */
   points?: string[];
-  /** What the nurse should watch for. */
+  /** What the nurse should watch for and do. */
   nursing?: string[];
+  /** Alerjiler ve çapraz reaksiyonlar için: aynı etken grubundaki diğer ilaçlar/antibiyotikler veya benzer gıdalar */
+  crossReactions?: string[];
+  /** Alerjik reaksiyon ve anafilaksi belirtileri */
+  reactionSigns?: string[];
+  /** Kaçınılması gereken maddeler ve riskli etkenler */
+  avoidList?: string[];
+  /** Fact category from anamnesis/summary */
+  category?: FactCategory;
   /** False when the model did not recognise the term. */
   known: boolean;
   /** "web": checked against a live web search; "ai": model knowledge only; "demo": simulation sample, never stored. */
@@ -29,6 +37,7 @@ export interface TermInfo {
 export interface TermQuery {
   term: string;
   kind: TermKind;
+  category?: FactCategory;
 }
 
 const KIND: Partial<Record<FactCategory, TermKind>> = {
@@ -70,5 +79,6 @@ export function termOf(fact: Pick<Fact, 'category' | 'text' | 'key'>): TermQuery
 
 /** Cache key shared by client and server. */
 export function termKey(q: TermQuery): string {
-  return `${q.kind}:${fold(q.term).replace(/[^\p{L}\p{N}]+/gu, ' ').trim()}`;
+  const cat = q.category ? `${q.category}:` : '';
+  return `${cat}${q.kind}:${fold(q.term).replace(/[^\p{L}\p{N}]+/gu, ' ').trim()}`;
 }

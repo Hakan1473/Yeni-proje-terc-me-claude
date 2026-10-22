@@ -290,9 +290,21 @@ export function AnamnesisPanel() {
   const total = facts.length;
 
   // Positive medical terms get a card; warm the cache so a tap opens instantly
-  const terms = useMemo(() => new Map(facts.filter((f) => !f.negated).map((f) => [f.key, termOf(f)] as const)), [facts]);
+  const terms = useMemo(
+    () =>
+      new Map<string, TermQuery | null>(
+        facts
+          .filter((f) => !f.negated)
+          .map((f) => {
+            const q = termOf(f);
+            const res: TermQuery | null = q ? { ...q, category: f.category } : null;
+            return [f.key, res];
+          }),
+      ),
+    [facts],
+  );
   useEffect(() => {
-    prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => !!q));
+    prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => q !== null));
   }, [terms]);
 
   const copy = async () => {

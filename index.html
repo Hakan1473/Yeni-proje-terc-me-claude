@@ -49,6 +49,71 @@
       html.dark { background: #05060b; }
     </style>
     <script>
+      // Ignore Vite HMR WebSocket errors in AI Studio iframe environment
+      (function () {
+        window.addEventListener('unhandledrejection', function (e) {
+          var msg = e && e.reason ? String(e.reason.message || e.reason) : '';
+          var stack = e && e.reason && e.reason.stack ? String(e.reason.stack) : '';
+          if (msg.indexOf('WebSocket') !== -1 || stack.indexOf('@vite/client') !== -1) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        });
+        window.addEventListener('error', function (e) {
+          var msg = e && e.message ? String(e.message) : '';
+          var fn = e && e.filename ? String(e.filename) : '';
+          if (msg.indexOf('WebSocket') !== -1 || fn.indexOf('@vite/client') !== -1) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+        if (typeof window.WebSocket === 'function') {
+          var NativeWS = window.WebSocket;
+          window.WebSocket = function (url, protocols) {
+            var urlStr = String(url || '');
+            if (protocols === 'vite-hmr' || (urlStr.indexOf('/live') === -1 && (urlStr.indexOf('vite') !== -1 || urlStr.indexOf('token=') !== -1))) {
+              var emitter = new EventTarget();
+              var mock = {
+                binaryType: 'blob',
+                bufferedAmount: 0,
+                extensions: '',
+                protocol: typeof protocols === 'string' ? protocols : '',
+                readyState: 1,
+                url: urlStr,
+                CONNECTING: 0,
+                OPEN: 1,
+                CLOSING: 2,
+                CLOSED: 3,
+                send: function () {},
+                close: function () { mock.readyState = 3; },
+                addEventListener: function (type, listener, options) {
+                  emitter.addEventListener(type, listener, options);
+                  if (type === 'open') {
+                    setTimeout(function () {
+                      try { emitter.dispatchEvent(new Event('open')); } catch (_) {}
+                    }, 0);
+                  }
+                },
+                removeEventListener: function (type, listener, options) {
+                  emitter.removeEventListener(type, listener, options);
+                },
+                dispatchEvent: function (event) { return emitter.dispatchEvent(event); },
+                set onopen(fn) { this.addEventListener('open', fn); },
+                set onmessage(fn) { this.addEventListener('message', fn); },
+                set onerror(fn) { this.addEventListener('error', fn); },
+                set onclose(fn) { this.addEventListener('close', fn); }
+              };
+              return mock;
+            }
+            return new NativeWS(url, protocols);
+          };
+          window.WebSocket.prototype = NativeWS.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+      })();
       // Apply the stored theme before first paint so there is no light/dark flash
       (function () {
         try {
