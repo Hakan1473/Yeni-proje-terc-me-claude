@@ -9,10 +9,14 @@ export type AiStatus = 'idle' | 'syncing' | 'ok' | 'error';
 interface Hooks {
   turns(): Turn[];
   languageName(): string;
+  /** Free-tier economy mode: fewer AI passes. */
+  economy(): boolean;
   publish(facts: Fact[], rejected: Fact[], status: AiStatus, syncedAt: number | null): void;
 }
 
 const DEBOUNCE_MS = 1200;
+// Economy mode waits for a pause in the conversation before the next AI pass
+const ECONOMY_DEBOUNCE_MS = 3500;
 const MAX_TURNS = 150;
 
 /**
@@ -46,6 +50,9 @@ export class AnamnesisSync {
     const facts = applyDrugCheck(extractFacts({ id: turn.id, speaker: turn.speaker, text, at: turn.createdAt }, this.dialogue), turn.drugCheck ?? []);
     this.ledger = addToLedger(this.ledger, facts);
     this.emit();
+    // Economy mode: the AI rereads the conversation after the patient answers. A nurse's
+    // question alone is shown by the instant extraction and is read with the next answer.
+    if (this.hooks.economy() && turn.speaker === 'nurse') return;
     this.schedule();
   }
 
@@ -54,7 +61,7 @@ export class AnamnesisSync {
     this.timer = window.setTimeout(() => {
       this.timer = null;
       void this.sync();
-    }, DEBOUNCE_MS);
+    }, this.hooks.economy() ? ECONOMY_DEBOUNCE_MS : DEBOUNCE_MS);
   }
 
   private async sync() {

@@ -45,6 +45,8 @@ export interface AppState {
   playingTurnId: string | null;
   translatingTurnId: string | null;
   mock: boolean;
+  /** Free-tier economy mode reported by the server. */
+  economy: boolean;
   online: boolean;
   toast: { kind: ToastKind; text: string; id: number } | null;
 }
@@ -132,6 +134,7 @@ class Engine {
   private readonly anamnesis = new AnamnesisSync({
     turns: () => this.turns(),
     languageName: () => this.store.get().language.nameTr,
+    economy: () => this.store.get().economy,
     publish: (facts, rejected, aiStatus, aiSyncedAt) => {
       this.store.set({ facts, rejected, aiStatus, aiSyncedAt });
       this.scheduleSave();
@@ -157,6 +160,7 @@ class Engine {
       playingTurnId: null,
       translatingTurnId: null,
       mock: false,
+      economy: false,
       online: navigator.onLine,
       toast: null,
     });
@@ -176,7 +180,7 @@ class Engine {
         void this.acquireWakeLock();
       }
     });
-    void api.health().then((h) => this.store.set({ mock: h.mock })).catch(() => {});
+    void api.health().then((h) => this.store.set({ mock: h.mock, economy: !!h.economy })).catch(() => {});
   }
 
   // ───────────────────────── session ─────────────────────────

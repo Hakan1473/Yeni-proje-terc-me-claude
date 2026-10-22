@@ -91,7 +91,7 @@ export function mountRoutes(app: Express): void {
   api.use(json({ limit: '256kb' }));
 
   api.get('/health', (_req, res) => {
-    res.json({ ok: true, mock: config.mock, accessRequired: !!config.accessCode, liveModel: config.models.live });
+    res.json({ ok: true, mock: config.mock, economy: config.economy, accessRequired: !!config.accessCode, liveModel: config.models.live });
   });
 
   api.post('/access', (req, res) => {

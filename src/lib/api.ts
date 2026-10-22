@@ -25,6 +25,8 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 export interface Health {
   ok: boolean;
   mock: boolean;
+  /** Free-tier economy mode: fewer AI calls (see server/config.ts). */
+  economy?: boolean;
   accessRequired: boolean;
 }
 

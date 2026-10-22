@@ -48,6 +48,8 @@ Proje AI Studio şablonuyla uyumludur: `server.ts` giriş dosyası, `metadata.js
 | `APP_ACCESS_CODE` | İsteğe bağlı. Tanımlanırsa uygulama açılışta bu kodu ister. Herkese açık adreste kotanızı korur. |
 | `MOCK_AI=1` | Simülasyon modu. |
 | `LIVE_MODEL`, `FAST_MODEL`, `SMART_MODEL`, `TTS_MODEL`, `TTS_FALLBACK_MODEL` | Model adlarını değiştirir (varsayılanlar `server/config.ts` içinde). |
+| `ECONOMY_MODE` | Varsayılan açık (ücretsiz API planı için tasarruf modu): Google araması denenmez, anamnez yapay zekâ analizi hasta cevaplarından sonra yapılır, bilgi kartları yalnızca dokunulunca hazırlanır, kotası dolan model daha uzun dinlendirilir. Ücretli anahtarda `ECONOMY_MODE=0` yapın. |
+| `FALLBACK_MODELS` | Yoğun veya kotası dolan modelin yerine sırayla denenen modeller (varsayılan: `gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite`). |
 | `LIVE_VOCABULARY=1` | İlaç adlarını konuşma tanımaya ipucu olarak gönderir. Model desteklemezse kendiliğinden kapanır. |
 
 ## Komutlar

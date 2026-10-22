@@ -25,6 +25,12 @@ export const config = {
   /** Simulation mode: explicit, or automatic when no API key is configured. */
   mock: process.env.MOCK_AI === '1' || !hasRealKey,
   accessCode: process.env.APP_ACCESS_CODE?.trim() || '',
+  /**
+   * Economy mode (default on, for the free API tier): no Google Search grounding,
+   * fewer anamnesis passes, no background term cards, longer rest for exhausted
+   * models. Set ECONOMY_MODE=0 on a paid key.
+   */
+  economy: process.env.ECONOMY_MODE !== '0',
   liveVocabulary: process.env.LIVE_VOCABULARY === '1',
   models: {
     live: process.env.LIVE_MODEL || 'gemini-3.8-live',

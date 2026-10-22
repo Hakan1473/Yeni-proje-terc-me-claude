@@ -303,10 +303,13 @@ export function AnamnesisPanel() {
       ),
     [facts],
   );
+  const economy = useStore(engine.store, (s) => s.economy);
   useEffect(() => {
+    // Economy mode: every card loads on tap only
+    if (economy) return;
     // Allergy and drug cards are opened most; the rest load on tap, which keeps the AI quota for the anamnesis
     prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => q !== null && (q.category === 'allergy' || q.category === 'medication')));
-  }, [terms]);
+  }, [terms, economy]);
 
   const copy = async () => {
     if (await copyText(formatAnamnesisReport(facts, language.nameTr))) {

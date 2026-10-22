@@ -45,7 +45,8 @@ const noMinimalThinking = new Set<string>();
 let groundingUntil = 0;
 
 function rest(model: string, msg: string) {
-  if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) cooldown.set(model, Date.now() + 60_000);
+  // On the free tier a 429 usually means the daily quota is spent: rest longer and spare the calls
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) cooldown.set(model, Date.now() + (config.economy ? 5 * 60_000 : 60_000));
   else if (/503|UNAVAILABLE|overloaded|high demand/i.test(msg)) cooldown.set(model, Date.now() + 20_000);
 }
 
@@ -137,7 +138,8 @@ export interface WebSource {
  * and the reply is parsed leniently. Returns the pages the answer was built on.
  */
 export async function generateGroundedJson<T>(req: Omit<JsonRequest, 'schema'>): Promise<{ data: T; sources: WebSource[] } | null> {
-  if (Date.now() < groundingUntil) return null;
+  // Economy mode: search grounding has no free quota, so it is not attempted at all
+  if (config.economy || Date.now() < groundingUntil) return null;
   for (const model of modelsToTry(req.models).slice(0, 2)) {
     if (Date.now() < groundingUntil) return null;
     let sources: WebSource[] = [];

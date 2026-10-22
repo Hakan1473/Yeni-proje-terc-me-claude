@@ -69,7 +69,10 @@ export function useOrbCanvas(canvas: React.RefObject<HTMLCanvasElement | null>, 
       const muted = !drive && s.muted;
       const raw = drive ? drive.current : !active || busy ? 0 : speaking ? engine.outLevel.get() : muted ? 0 : engine.micLevel.get();
       // Fast attack, slow release: the light swells with a syllable and settles gently
-      energy += (raw - energy) * (raw > energy ? 0.45 : 0.07);
+      // An audio level can be NaN for a frame (empty analyser buffer): never let it reach the canvas
+      const level = Number.isFinite(raw) ? raw : 0;
+      energy += (level - energy) * (level > energy ? 0.45 : 0.07);
+      if (!Number.isFinite(energy)) energy = 0;
 
       const speed = reduced.matches ? 0.08 : busy ? 1.4 : active ? 0.35 + energy * 1.8 : 0.22;
       clock += dt * speed;
