@@ -1,7 +1,9 @@
 import { type TermInfo, type TermQuery, termKey } from '../../shared/medical/terms';
 import * as api from './api';
 
-const STORAGE = 'tr.terms';
+// v2: cards are web-checked; earlier ones (including simulation samples) are discarded
+const STORAGE = 'tr.terms.v2';
+const OLD_STORAGE = ['tr.terms'];
 const TTL = 30 * 24 * 3600 * 1000;
 const MAX = 300;
 
@@ -9,6 +11,7 @@ type Stored = Record<string, { at: number; info: TermInfo }>;
 
 function load(): Stored {
   try {
+    for (const k of OLD_STORAGE) localStorage.removeItem(k);
     return JSON.parse(localStorage.getItem(STORAGE) ?? '{}') as Stored;
   } catch {
     return {};
@@ -47,7 +50,8 @@ export function fetchTerm(q: TermQuery): Promise<TermInfo> {
     p = api
       .term(q)
       .then((info) => {
-        if (info.known) persist(key, info);
+        // Simulation samples are never kept: the real answer must replace them once a key is set
+        if (info.known && info.origin !== 'demo') persist(key, info);
         return info;
       })
       .finally(() => pending.delete(key));

@@ -1,4 +1,4 @@
-import { CircleCheck, FlaskConical, type LucideIcon, Quote, RefreshCw, ShieldAlert, Sparkles, Tag } from 'lucide-react';
+import { CircleCheck, FlaskConical, Globe, type LucideIcon, Quote, RefreshCw, ShieldAlert, Sparkles, Tag } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { TermInfo, TermKind, TermQuery } from '../../shared/medical/terms';
 import type { Fact } from '../../shared/types';
@@ -172,9 +172,33 @@ export function TermSheet({
         </figure>
       )}
 
+      {info?.known && info.sources && info.sources.length > 0 && (
+        <section className="mt-5 anim-fade">
+          <h3 className="px-1 mb-2 text-[13px] font-medium text-label-2">Kaynaklar</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {info.sources.map((s) => (
+              <a
+                key={s.url}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pressable max-w-full h-8 px-3 rounded-full bg-fill text-[13px] text-accent inline-flex items-center gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                <span className="truncate">{s.title}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       <p className="mt-6 flex items-center gap-1.5 text-[12px] text-label-3">
-        <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
-        Yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez
+        {info?.origin === 'web' ? <Globe className="w-3.5 h-3.5" strokeWidth={2} /> : <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />}
+        {info?.origin === 'web'
+          ? 'İnternet kaynaklarıyla doğrulanmış yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'
+          : info?.origin === 'demo'
+            ? 'Simülasyon örneği · Gerçek bilgi değildir'
+            : 'Yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'}
       </p>
     </Sheet>
   );

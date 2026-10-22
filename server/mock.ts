@@ -120,12 +120,13 @@ export function mockTerm(term: string, kind: TermKind): TermInfo {
   const hit = MOCK_TERMS.find((t) => f.includes(t.match));
   if (hit) {
     const { match: _match, ...card } = hit;
-    return { term, kind, known: true, ...card };
+    return { term, kind, known: true, origin: 'demo', ...card };
   }
   return {
     term,
     kind,
     known: true,
-    summary: 'Simülasyon modunda bu terim için örnek bilgi yok. Gerçek API anahtarıyla yapay zekâ burada kısa bir açıklama gösterir.',
+    origin: 'demo',
+    summary: 'Simülasyon modunda bu terim için örnek bilgi yok. Gerçek API anahtarıyla yapay zekâ burada internetten doğrulanmış kısa bir açıklama gösterir.',
   };
 }

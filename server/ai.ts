@@ -60,6 +60,54 @@ export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
   return null;
 }
 
+export interface WebSource {
+  title: string;
+  url: string;
+}
+
+/**
+ * JSON answer grounded in a live Google Search. Search grounding cannot be
+ * combined with a response schema, so the instruction spells out the JSON shape
+ * and the reply is parsed leniently. Returns the pages the answer was built on.
+ */
+export async function generateGroundedJson<T>(
+  req: Omit<JsonRequest, 'schema'>,
+): Promise<{ data: T; sources: WebSource[] } | null> {
+  for (const model of req.models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), req.timeoutMs);
+    try {
+      const res = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
+        config: {
+          systemInstruction: req.system,
+          tools: [{ googleSearch: {} }],
+          temperature: req.temperature ?? 0.2,
+          abortSignal: controller.signal,
+        },
+      });
+      const data = parseJson<T>(res.text);
+      if (!data) continue;
+      const seen = new Set<string>();
+      const sources: WebSource[] = [];
+      for (const chunk of res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []) {
+        const title = chunk.web?.title?.trim();
+        const url = chunk.web?.uri;
+        if (!title || !url || seen.has(title)) continue;
+        seen.add(title);
+        sources.push({ title, url });
+      }
+      return { data, sources: sources.slice(0, 4) };
+    } catch (err) {
+      console.warn(`[ai] grounded ${model} failed:`, (err as Error).message);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
 /** Wrap raw 16-bit mono PCM in a WAV container so browsers can decode it. */
 export function pcmToWav(pcm: Buffer, sampleRate = 24000): Buffer {
   const header = Buffer.alloc(44);

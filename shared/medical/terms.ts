@@ -20,6 +20,10 @@ export interface TermInfo {
   nursing?: string[];
   /** False when the model did not recognise the term. */
   known: boolean;
+  /** "web": checked against a live web search; "ai": model knowledge only; "demo": simulation sample, never stored. */
+  origin?: 'web' | 'ai' | 'demo';
+  /** Pages the web answer was built on. */
+  sources?: { title: string; url: string }[];
 }
 
 export interface TermQuery {

@@ -9,7 +9,7 @@ import { fuseSpeaker } from '../shared/speaker';
 import { fold, words } from '../shared/text';
 import type { AnamnesisRequest, ConversationSummary, Fact, FactCategory, Speaker } from '../shared/types';
 import { VOICES } from '../shared/types';
-import { generateJson, synthesize } from './ai';
+import { generateGroundedJson, generateJson, synthesize } from './ai';
 import { config } from './config';
 import { mockSpeech, mockTerm, mockTranslate } from './mock';
 import { anamnesisInstruction, summaryInstruction, termInstruction, translateInstruction } from './prompts';
@@ -329,25 +329,35 @@ export function mountRoutes(app: Express): void {
       res.json(mockTerm(term, kind));
       return;
     }
-    const out = await generateJson<Partial<TermInfo>>({
-      models: [config.models.fast, config.models.smart],
+    // Look the term up on the web first; model knowledge alone is the fallback
+    const grounded = await generateGroundedJson<Partial<TermInfo>>({
+      models: [config.models.smart, config.models.fast],
       system: termInstruction,
       input: { term, kind },
-      schema: {
-        type: Type.OBJECT,
-        properties: {
-          known: { type: Type.BOOLEAN },
-          summary: { type: Type.STRING },
-          activeIngredient: { type: Type.STRING },
-          drugClass: { type: Type.STRING },
-          points: { type: Type.ARRAY, items: { type: Type.STRING } },
-          nursing: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
-        required: ['known', 'summary'],
-      },
-      timeoutMs: 8000,
+      timeoutMs: 14000,
       temperature: 0.1,
     });
+    const out =
+      grounded?.data ??
+      (await generateJson<Partial<TermInfo>>({
+        models: [config.models.fast, config.models.smart],
+        system: termInstruction,
+        input: { term, kind },
+        schema: {
+          type: Type.OBJECT,
+          properties: {
+            known: { type: Type.BOOLEAN },
+            summary: { type: Type.STRING },
+            activeIngredient: { type: Type.STRING },
+            drugClass: { type: Type.STRING },
+            points: { type: Type.ARRAY, items: { type: Type.STRING } },
+            nursing: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['known', 'summary'],
+        },
+        timeoutMs: 8000,
+        temperature: 0.1,
+      }));
     if (!out) {
       res.status(502).json({ error: 'term_failed' });
       return;
@@ -362,7 +372,12 @@ export function mountRoutes(app: Express): void {
       drugClass: kind === 'drug' ? cleanString(out.drugClass, 80) || undefined : undefined,
       points: list(out.points, 3),
       nursing: list(out.nursing, 3),
+      origin: grounded ? 'web' : 'ai',
+      sources: grounded?.sources
+        .map((x) => ({ title: cleanString(x.title, 80), url: x.url }))
+        .filter((x) => x.title && /^https:\/\//.test(x.url)),
     };
+    if (!info.sources?.length) info.sources = undefined;
     if (info.known) {
       if (termCache.size >= TERM_CACHE_MAX) termCache.delete(termCache.keys().next().value as string);
       termCache.set(cacheKey, info);
