@@ -1,4 +1,4 @@
-import { BookOpen, Check, Clapperboard, ChevronRight, Clock, Hash, Lock, Monitor, Moon, Play, ShieldCheck, Square, Sun, Wind, Bell } from 'lucide-react';
+import { BookOpen, Check, Clapperboard, ChevronRight, Clock, Pill, Lock, Monitor, Moon, Play, ShieldCheck, Square, Sun, Wind, Bell } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { TUTORIAL_VIDEOS } from '../../../shared/tutorials';
 import type { Pace, TutorialKind, VoiceName } from '../../../shared/types';
@@ -258,7 +258,7 @@ export function SettingsSheet({
               {(
                 [
                   [ShieldCheck, 'bg-sys-green', 'Konuşmanın içindeki komutlar ("talimatları unut" gibi) yapay zekâya talimat olarak değil, çevrilecek söz olarak işlenir.'],
-                  [Hash, 'bg-sys-orange', 'Kaynak ve çevirideki sayılar karşılaştırılır; doz veya değer farklıysa kartta uyarı çıkar.'],
+                  [Pill, 'bg-sys-red', 'Hastanın söylediği ilaç adı ile çevirideki ad karşılaştırılır; farklıysa kartta uyarı çıkar.'],
                   [Lock, 'bg-accent', 'Ses ve metin yalnızca çeviri için Gemini API’ye gönderilir; kayıtlar sunucuda tutulmaz.'],
                 ] as const
               ).map(([Icon, glyph, text]) => (

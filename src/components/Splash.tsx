@@ -194,49 +194,70 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the timeline runs once
   useEffect(() => {
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) {
-      if (orbWrap.current) orbWrap.current.style.opacity = '1';
-      setTitle(true);
-      fade.current = 0.6;
-      const t = setTimeout(exit, 1200);
-      return () => clearTimeout(t);
-    }
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
-
-    orbWrap.current?.animate(
-      [
-        { transform: 'scale(0.35)', opacity: 0, filter: 'blur(18px)' },
-        { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)' },
-      ],
-      { duration: 900, delay: T_ORB, easing: SPRING, fill: 'both' },
-    );
-    // Streams fade in as the sphere settles
-    const fadeIn = (start: number) => {
-      const step = () => {
-        fade.current = Math.min(1, (performance.now() - start) / 700);
-        if (fade.current < 1 && !exiting.current) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
+    let cancelled = false;
+    let begun = false;
+    // A home-screen app keeps its launch image up until the page has loaded; a timeline
+    // started earlier would play unseen. Start once the page is loaded and painted.
+    const begin = () => {
+      if (begun || cancelled) return;
+      begun = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => !cancelled && run()));
     };
-    at(T_WORDS - 250, () => fadeIn(performance.now()));
-    GREETINGS.forEach((_, i) => {
-      at(T_WORDS + i * WORD_MS, () => {
-        setWord(i);
-        level.current = 0.55 + (i % 3) * 0.15;
-        at(WORD_MS * 0.55, () => (level.current = 0.12));
-      });
-    });
-    at(T_TITLE, () => {
-      setTitle(true);
-      level.current = 0.35;
-      at(400, () => (level.current = 0.08));
-    });
-    at(T_EXIT, exit);
+    if (document.readyState === 'complete') begin();
+    else {
+      window.addEventListener('load', begin, { once: true });
+      // Never hold the app back on a slow resource
+      at(2500, begin);
+    }
     return () => {
+      cancelled = true;
+      window.removeEventListener('load', begin);
       for (const t of timers) clearTimeout(t);
     };
+
+    function run() {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {
+        // Reduce Motion: the same scene, faded in and held, without movement
+        orbWrap.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: 'both' });
+        fade.current = 0.6;
+        at(300, () => setTitle(true));
+        at(2000, exit);
+        return;
+      }
+
+      orbWrap.current?.animate(
+        [
+          { transform: 'scale(0.35)', opacity: 0, filter: 'blur(18px)' },
+          { transform: 'scale(1)', opacity: 1, filter: 'blur(0px)' },
+        ],
+        { duration: 900, delay: T_ORB, easing: SPRING, fill: 'both' },
+      );
+      // Streams fade in as the sphere settles
+      const fadeIn = (start: number) => {
+        const step = () => {
+          fade.current = Math.min(1, (performance.now() - start) / 700);
+          if (fade.current < 1 && !exiting.current) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+      at(T_WORDS - 250, () => fadeIn(performance.now()));
+      GREETINGS.forEach((_, i) => {
+        at(T_WORDS + i * WORD_MS, () => {
+          setWord(i);
+          level.current = 0.55 + (i % 3) * 0.15;
+          at(WORD_MS * 0.55, () => (level.current = 0.12));
+        });
+      });
+      at(T_TITLE, () => {
+        setTitle(true);
+        level.current = 0.35;
+        at(400, () => (level.current = 0.08));
+      });
+      at(T_EXIT, exit);
+    }
   }, []);
 
   return (

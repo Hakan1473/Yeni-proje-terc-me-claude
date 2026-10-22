@@ -1,5 +1,5 @@
-import { ArrowsClockwise, CaretLeft } from '@phosphor-icons/react';
-import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Hash, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
+import { ArrowsClockwise, ArrowUUpLeft } from '@phosphor-icons/react';
+import { ArrowLeftRight, Check, ChevronLeft, CircleAlert, Lock, MicOff, Send, WifiOff, X } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { LANGUAGES } from '../../shared/languages';
 import { TUTORIAL_VIDEOS } from '../../shared/tutorials';
@@ -170,7 +170,7 @@ export function FaceToFace({ onClose, initialVideo = null }: { onClose: () => vo
       <div className="relative shrink-0 flex items-center justify-center px-4 py-2">
         <span className="absolute inset-x-0 top-1/2 h-px bg-separator" aria-hidden="true" />
         <nav aria-label="Karşılıklı görünüm kontrolleri" className="dock relative">
-          <DockKey icon={CaretLeft} label="Kapat" onClick={onClose} />
+          <DockKey icon={ArrowUUpLeft} weight="bold" label="Geri dön" onClick={onClose} />
           <span className="dock-orb">
             <Orb size={64} />
           </span>
@@ -254,14 +254,14 @@ const STEPS: { title: string; body: string; glyph: string; visual: ReactNode }[]
     ),
   },
   {
-    title: 'Sayılar iki kez kontrol edilir',
-    body: 'Doz, tansiyon, ateş gibi değerler kaynak ve çeviride karşılaştırılır. "500 mg" çeviride "50 mg" olursa kart turuncu uyarı gösterir.',
-    glyph: 'bg-sys-orange',
+    title: 'İlaç adları teyit edilir',
+    body: 'Hastanın söylediği ilaç adı ile çevirideki ad karşılaştırılır. Farklıysa kartta uyarı çıkar ve anamneze hastanın söylediği ad yazılır.',
+    glyph: 'bg-sys-red',
     visual: (
-      <div className="rounded-[14px] bg-sys-orange/12 px-4 py-3 text-[14px] text-left flex items-start gap-2">
-        <Hash className="w-4 h-4 text-sys-orange mt-0.5 shrink-0" strokeWidth={2.5} />
+      <div className="rounded-[14px] bg-sys-red/10 px-4 py-3 text-[14px] text-left flex items-start gap-2">
+        <CircleAlert className="w-4 h-4 text-sys-red mt-0.5 shrink-0" strokeWidth={2.5} />
         <span>
-          <b>Sayıları kontrol edin.</b> Kaynakta 500, çeviride 50 geçiyor.
+          <b>İlaç adını teyit edin.</b> Hasta “Alipsa” dedi, çeviride “Eliquis” geçiyor.
         </span>
       </div>
     ),

@@ -105,6 +105,11 @@ export interface Fact {
   pinned?: boolean;
   /** Why this fact must be confirmed with the patient (e.g. the drug name differed between speech and translation). */
   verify?: string;
+  /** Confirmed by an AI pass over the conversation: stays until explicitly corrected or removed by the nurse. */
+  settled?: boolean;
+  /** When the item first appeared; keeps its place in the list while its wording is refined. */
+  since?: number;
+  /** Time of the latest turn that mentioned it. */
   at: number;
 }
 
@@ -161,7 +166,7 @@ export type VoiceName = (typeof VOICES)[number];
 export type Pace = 'fast' | 'balanced' | 'patient';
 
 export const PACE_SILENCE_MS: Record<Pace, number> = {
-  fast: 450,
-  balanced: 700,
+  fast: 400,
+  balanced: 550,
   patient: 1100,
 };

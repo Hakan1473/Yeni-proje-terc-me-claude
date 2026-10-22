@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combineLayers, factText, formatAnamnesisReport, mergeFacts } from '../shared/medical/anamnesis';
+import { addToLedger, factText, formatAnamnesisReport, mergeFacts, presentFacts, reconcileAi } from '../shared/medical/anamnesis';
 import type { Fact } from '../shared/types';
 
 const fact = (key: string, text: string, at: number, extra: Partial<Fact> = {}): Fact => ({
@@ -25,45 +25,71 @@ describe('mergeFacts', () => {
   });
 });
 
-describe('combineLayers', () => {
-  const local = [
-    fact('medication:parasetamol', 'Parol (parasetamol)', 1),
-    fact('allergy:penisilin', 'Penisilin', 1, { pinned: true }),
-    fact('complaint:bulanti', 'Bulantı', 5),
-    fact('chronic:astim', 'Astım', 1),
-  ];
+describe('anamnesis ledger', () => {
+  const ai = (key: string, text: string, extra: Partial<Fact> = {}) => fact(key, text, 10, { origin: 'ai', ...extra });
 
-  it('returns local facts while no AI pass exists', () => {
-    expect(combineLayers(local, null)).toHaveLength(4);
+  it('keeps confirmed medications when a later AI pass leaves them out', () => {
+    let ledger = addToLedger([], [fact('medication:metoprolol', 'Beloc (metoprolol)', 1), fact('medication:metformin', 'Glifor (metformin)', 2)]);
+    ledger = reconcileAi(ledger, [ai('medication:metoprolol', 'Beloc (metoprolol) 50 mg'), ai('medication:metformin', 'Glifor (metformin)')], [], 2);
+    // Next pass forgets one drug: it must stay
+    ledger = reconcileAi(ledger, [ai('medication:metoprolol', 'Beloc (metoprolol) 50 mg')], [], 5);
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Beloc (metoprolol) 50 mg', 'Glifor (metformin)']);
   });
 
-  it('trusts the AI for reviewed facts but keeps newer local ones and pinned allergies', () => {
-    const ai = {
-      facts: [{ ...fact('medication:parasetamol', 'Parol 500 mg', 3), origin: 'ai' as const }],
-      retracted: [],
-      watermark: 3,
-    };
-    const out = combineLayers(local, ai);
-    expect(out.map((f) => f.text)).toEqual(['Bulantı', 'Penisilin', 'Parol 500 mg']);
+  it('keeps the confirmed wording when the AI only rephrases it', () => {
+    let ledger = reconcileAi([], [ai('chronic:diyabet', 'Tip 2 diyabet')], [], 1);
+    ledger = reconcileAi(ledger, [ai('chronic:diyabet', 'Şeker hastalığı (diyabet)')], [], 2);
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Tip 2 diyabet']);
+    ledger = reconcileAi(ledger, [ai('chronic:diyabet', 'Tip 2 diyabet, 10 yıldır')], [], 3);
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Tip 2 diyabet, 10 yıldır']);
   });
 
-  it('drops a pinned allergy only when the AI explicitly retracts it', () => {
-    const ai = { facts: [], retracted: ['allergy:penisilin'], watermark: 3 };
-    expect(combineLayers(local, ai).some((f) => f.key === 'allergy:penisilin')).toBe(false);
+  it('keeps left and right findings apart', () => {
+    const ledger = addToLedger([], [fact('complaint:diz agrisi', 'Sol diz ağrısı', 1), fact('complaint:diz agrisi', 'Sağ diz ağrısı', 2)]);
+    expect(ledger).toHaveLength(2);
+  });
+
+  it('removes an unconfirmed local reading once the AI has read it', () => {
+    let ledger = addToLedger([], [fact('complaint:bulanti', 'Bulantı', 1), fact('chronic:astim', 'Astım', 4)]);
+    ledger = reconcileAi(ledger, [], [], 2);
+    // "Bulantı" was read and not confirmed; "Astım" came after the pass and waits for the next one
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Astım']);
+  });
+
+  it('removes a confirmed item only when the conversation retracts it', () => {
+    let ledger = reconcileAi([], [ai('allergy:penisilin', 'Penisilin')], [], 1);
+    ledger = reconcileAi(ledger, [], [], 2);
+    expect(ledger).toHaveLength(1);
+    ledger = reconcileAi(ledger, [ai('allergy:amoksisilin', 'Amoksisilin')], ['allergy:penisilin'], 3);
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Amoksisilin']);
+  });
+
+  it('refines an item in place and keeps its position', () => {
+    let ledger = addToLedger([], [fact('complaint:bas agrisi', 'Baş ağrısı', 1), fact('complaint:bulanti', 'Bulantı', 2)]);
+    ledger = reconcileAi(ledger, [ai('complaint:bulanti', 'Bulantı'), ai('complaint:bas agrisi', 'Baş ağrısı (2 gündür)')], [], 2);
+    expect(presentFacts(ledger).map((f) => f.text)).toEqual(['Baş ağrısı (2 gündür)', 'Bulantı']);
+  });
+
+  it('lets the latest statement win for single-value items', () => {
+    let ledger = addToLedger([], [fact('complaint:pain-score', 'Ağrı şiddeti: 7/10', 1)]);
+    ledger = addToLedger(ledger, [fact('complaint:pain-score', 'Ağrı şiddeti: 4/10', 2)]);
+    expect(ledger.map((f) => f.text)).toEqual(['Ağrı şiddeti: 4/10']);
+  });
+
+  it('keeps a dose detail when a later mention is vaguer', () => {
+    let ledger = addToLedger([], [fact('medication:metoprolol', 'Beloc (metoprolol) 50 mg', 1)]);
+    ledger = addToLedger(ledger, [fact('medication:metoprolol', 'Beloc (metoprolol)', 2)]);
+    expect(ledger[0].text).toBe('Beloc (metoprolol) 50 mg');
   });
 
   it('never lists an allergy drug as a medication too', () => {
-    const ai = {
-      facts: [
-        { ...fact('medication:amlodipin', 'Amlodis (amlodipin)', 3), origin: 'ai' as const },
-        { ...fact('medication:feniramin', 'Avil (feniramin)', 3), origin: 'ai' as const },
-        { ...fact('medication:metformin', 'Glifor (metformin)', 3), origin: 'ai' as const },
-      ],
-      retracted: [],
-      watermark: 3,
-    };
-    const allergies = [fact('allergy:amlodis', 'Amlodis (amlodipin)', 2, { pinned: true }), fact('allergy:avil', 'Avil', 2, { pinned: true })];
-    expect(combineLayers(allergies, ai).map((f) => `${f.category}: ${f.text}`)).toEqual([
+    const ledger = reconcileAi(
+      addToLedger([], [fact('allergy:amlodis', 'Amlodis (amlodipin)', 2, { pinned: true }), fact('allergy:avil', 'Avil', 2, { pinned: true })]),
+      [ai('medication:amlodipin', 'Amlodis (amlodipin)'), ai('medication:feniramin', 'Avil (feniramin)'), ai('medication:metformin', 'Glifor (metformin)')],
+      [],
+      3,
+    );
+    expect(presentFacts(ledger).map((f) => `${f.category}: ${f.text}`)).toEqual([
       'allergy: Amlodis (amlodipin)',
       'allergy: Avil',
       'medication: Glifor (metformin)',
@@ -71,10 +97,7 @@ describe('combineLayers', () => {
   });
 
   it('hides a generic negative once a positive exists', () => {
-    const out = combineLayers(
-      [fact('allergy:__none__', 'Bilinen alerji yok', 1, { negated: true }), fact('allergy:lateks', 'Lateks', 2)],
-      null,
-    );
+    const out = presentFacts(addToLedger([], [fact('allergy:__none__', 'Bilinen alerji yok', 1, { negated: true }), fact('allergy:lateks', 'Lateks', 2)]));
     expect(out.map((f) => f.text)).toEqual(['Lateks']);
   });
 });

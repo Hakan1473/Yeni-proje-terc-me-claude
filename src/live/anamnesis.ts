@@ -1,4 +1,4 @@
-import { type AiLayer, combineLayers, isRejected, mergeFacts } from '../../shared/medical/anamnesis';
+import { addToLedger, isRejected, presentFacts, reconcileAi } from '../../shared/medical/anamnesis';
 import { applyDrugCheck } from '../../shared/medical/drugcheck';
 import { DialogueState, extractFacts } from '../../shared/medical/extract';
 import type { Fact, Turn } from '../../shared/types';
@@ -16,18 +16,19 @@ const DEBOUNCE_MS = 1200;
 const MAX_TURNS = 150;
 
 /**
- * Two-layer live anamnesis.
- *   Local layer: deterministic extraction on every finished turn (instant).
- *   AI layer: debounced pass over the whole conversation (up to MAX_TURNS) plus
- *   the current fact list. Rereading everything each time lets the AI see which
- *   question an answer belongs to ("Any allergies?" → "Yes. Amlodis, Avil.")
- *   and correct its own earlier mistakes. See combineLayers() for merging.
- * Facts the nurse removed (after checking with the patient) stay removed: they
- * are filtered from both layers and sent to the AI as rejected.
+ * Live anamnesis as a ledger the nurse can rely on.
+ *   Instant: deterministic extraction on every finished turn adds provisional items.
+ *   AI: a debounced pass over the whole conversation (up to MAX_TURNS) confirms,
+ *   refines and adds items. Rereading everything each time lets the AI see which
+ *   question an answer belongs to ("Any allergies?" → "Yes. Amlodis, Avil.").
+ * Confirmed items never disappear because a later pass left them out; they go
+ * only when the conversation corrects them or the nurse removes them (those
+ * are sent to the AI as rejected and never return). See reconcileAi().
  */
 export class AnamnesisSync {
-  private local: Fact[] = [];
-  private ai: AiLayer | null = null;
+  private ledger: Fact[] = [];
+  /** Creation time of the newest turn an AI pass has read. */
+  private watermark = 0;
   private rejected: Fact[] = [];
   private dialogue = new DialogueState();
   private timer: number | null = null;
@@ -43,7 +44,7 @@ export class AnamnesisSync {
     if (!text?.trim()) return;
     // A drug name the translation got wrong is filed under the name the speaker said
     const facts = applyDrugCheck(extractFacts({ id: turn.id, speaker: turn.speaker, text, at: turn.createdAt }, this.dialogue), turn.drugCheck ?? []);
-    this.local = mergeFacts(this.local, facts);
+    this.ledger = addToLedger(this.ledger, facts);
     this.emit();
     this.schedule();
   }
@@ -62,8 +63,7 @@ export class AnamnesisSync {
       return;
     }
     const done = this.hooks.turns().filter((t) => t.status === 'done' && (t.source || t.translation));
-    const watermark = this.ai?.watermark ?? 0;
-    const fresh = done.filter((t) => t.createdAt > watermark);
+    const fresh = done.filter((t) => t.createdAt > this.watermark);
     if (fresh.length === 0) return;
     const recent = done.slice(-MAX_TURNS);
     const known = this.combined();
@@ -81,22 +81,20 @@ export class AnamnesisSync {
         controller.signal,
       );
       if (controller.signal.aborted) return;
-      const mark = Math.max(...fresh.map((t) => t.createdAt));
+      // Everything up to the newest turn sent was read by this pass
+      const mark = Math.max(...recent.map((t) => t.createdAt));
       const facts: Fact[] = res.facts.map((f) => ({
         ...f,
         origin: 'ai',
         at: mark,
-        pinned: f.category === 'allergy' && !f.negated,
+        pinned: (f.category === 'allergy' && !f.negated) || undefined,
       }));
-      // An allergy confirmed earlier survives a later pass that forgot it, unless retracted
-      for (const prev of this.ai?.facts ?? []) {
-        if (prev.pinned && !facts.some((f) => f.key === prev.key) && !res.retracted.includes(prev.key)) facts.push(prev);
-      }
-      this.ai = { facts, retracted: res.retracted, watermark: mark };
+      this.ledger = reconcileAi(this.ledger, facts, res.retracted, mark);
+      this.watermark = Math.max(this.watermark, mark);
       this.syncedAt = Date.now();
       this.setStatus('ok');
     } catch {
-      // Keep both layers as they are; the next turn retries
+      // Keep the ledger as it is; the next turn retries
       if (!controller.signal.aborted) this.setStatus('error');
     } finally {
       if (this.inFlight === controller) this.inFlight = null;
@@ -113,7 +111,7 @@ export class AnamnesisSync {
   }
 
   private combined(): Fact[] {
-    return combineLayers(this.local, this.ai).filter((f) => !isRejected(f, this.rejected));
+    return presentFacts(this.ledger.filter((f) => !isRejected(f, this.rejected)));
   }
 
   private emit() {
@@ -133,16 +131,16 @@ export class AnamnesisSync {
   }
 
   /**
-   * New or restored conversation. Restored facts become an already-reviewed
-   * AI layer up to `watermark`, so only new turns are sent next time.
+   * New or restored conversation. Restored facts are already confirmed up to
+   * `watermark`, so only new turns trigger the next pass.
    */
   reset(facts: Fact[] = [], watermark = 0, rejected: Fact[] = []) {
     this.inFlight?.abort();
     this.inFlight = null;
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
-    this.local = watermark ? [] : facts;
-    this.ai = watermark ? { facts, retracted: [], watermark } : null;
+    this.ledger = facts.map((f) => ({ ...f, settled: watermark ? true : f.settled }));
+    this.watermark = watermark;
     this.rejected = rejected;
     this.dialogue = new DialogueState();
     this.status = 'idle';

@@ -1,7 +1,7 @@
 import { Type } from '@google/genai';
 import { type Express, json, Router } from 'express';
 import { getLanguage } from '../shared/languages';
-import { combineLayers, isRejected, mergeFacts } from '../shared/medical/anamnesis';
+import { isRejected, mergeFacts, presentFacts } from '../shared/medical/anamnesis';
 import { applyDrugCheck, checkDrugNames, describeDrugMismatch, type DrugMismatch } from '../shared/medical/drugcheck';
 import { canonicalKey, DialogueState, drugIdentity, drugMentions, extractFacts } from '../shared/medical/extract';
 import { type TermInfo, type TermKind, termKey } from '../shared/medical/terms';
@@ -82,7 +82,7 @@ function localAnamnesis(turns: TurnInput[], known: Fact[]): Fact[] {
     const extracted = extractFacts({ id: t.id, speaker: t.speaker, text, at: Date.now() + i }, state);
     if (!t.context) facts = mergeFacts(facts, extracted);
   });
-  return combineLayers(facts, null);
+  return presentFacts(facts);
 }
 
 export function mountRoutes(app: Express): void {

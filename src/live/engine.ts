@@ -1,7 +1,6 @@
 import { getLanguage, TURKISH_BCP47 } from '../../shared/languages';
 import { appendFragment, normalizeTranscript } from '../../shared/normalize';
 import { checkDrugNames } from '../../shared/medical/drugcheck';
-import { checkNumbers } from '../../shared/numbers';
 import { fuseSpeaker } from '../../shared/speaker';
 import { detectTutorial } from '../../shared/tutorials';
 import type {
@@ -63,7 +62,9 @@ interface OpenTurn {
 }
 
 // No live output this long after the speaker stopped: translate over REST instead
-const FALLBACK_AFTER_MS = 3500;
+const FALLBACK_AFTER_MS = 2800;
+// After the REST fallback answered, a late live reply to the same utterance is dropped for this long
+const LATE_LIVE_MS = 12_000;
 // Late input transcription for a finished turn still belongs to it
 const LATE_INPUT_MS = 500;
 
@@ -84,6 +85,8 @@ class Engine {
   private active = false;
   private liveReady = false;
   private current: OpenTurn | null = null;
+  /** Until then, live output belongs to an utterance the REST fallback already translated. */
+  private lateLiveUntil = 0;
   private wakeLock: { release(): Promise<void> } | null = null;
   private saveTimer: number | null = null;
   private levelLoop: number | null = null;
@@ -109,6 +112,11 @@ class Engine {
     audio: (pcm) => this.onAudio(pcm),
     turnComplete: () => {
       speaker.endLive();
+      if (this.droppingLateLive()) {
+        // The late live reply is over; the next one is for a new utterance
+        this.lateLiveUntil = 0;
+        return;
+      }
       this.onTurnComplete();
     },
     interrupted: () => {
@@ -316,6 +324,7 @@ class Engine {
     // Transcription can trail the reply; the microphone is closed while the
     // interpreter talks, so input that arrives then belongs to the last turn
     const belongs = cur && (!cur.closed || speaker.isPlaying() || Date.now() - cur.closedAt < LATE_INPUT_MS);
+    if (!belongs) this.lateLiveUntil = 0;
     const open = belongs && cur ? cur : this.beginTurn();
     open.source = appendFragment(open.source, fragment);
     this.refresh(open, open.closed, open.closed ? {} : { status: open.hadOutput ? 'translating' : 'capturing' });
@@ -324,8 +333,12 @@ class Engine {
     if (!open.hadOutput) this.armFallback(open);
   }
 
+  private droppingLateLive() {
+    return Date.now() < this.lateLiveUntil;
+  }
+
   private onOutput(fragment: string) {
-    if (!this.active) return;
+    if (!this.active || this.droppingLateLive()) return;
     let open = this.current;
     if (!open || (open.closed && !speaker.isPlaying())) open = this.beginTurn();
     open.hadOutput = true;
@@ -336,7 +349,7 @@ class Engine {
   }
 
   private onAudio(pcm: ArrayBuffer) {
-    if (!this.active) return;
+    if (!this.active || this.droppingLateLive()) return;
     const open = this.current;
     if (open) {
       open.hadOutput = true;
@@ -386,6 +399,8 @@ class Engine {
       if (controller.signal.aborted || open.hadOutput) return;
       open.translation = res.translation;
       open.closed = true;
+      // Each utterance is interpreted once: a slow live reply to it must not repeat the translation
+      if (this.active) this.lateLiveUntil = Date.now() + LATE_LIVE_MS;
       this.refresh(open, true, { via: 'rest' });
       this.finalize(open, res.speaker);
       if (speak && this.active && !speaker.isPlaying()) void this.speakTurn(open.id);
@@ -414,7 +429,6 @@ class Engine {
       source,
       translation,
       status: translation ? 'done' : 'failed',
-      numberCheck: translation && source ? checkNumbers(source, srcLang, translation, trLang) : undefined,
       drugCheck: drugCheck.length ? drugCheck : undefined,
       tutorial: who === 'nurse' ? detectTutorial(source, translation) : undefined,
     };

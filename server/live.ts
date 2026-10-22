@@ -8,6 +8,7 @@ import {
   Modality,
   type Session,
   StartSensitivity,
+  ThinkingLevel,
 } from '@google/genai';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { getLanguage } from '../shared/languages';
@@ -61,10 +62,20 @@ interface Upstream {
 // dropped automatically if the model rejects the field.
 const VOCABULARY = Array.from(new Set(DRUGS.map((d) => d.name).concat(['Triflow', 'Clexane', 'serum', 'damar yolu', 'tansiyon'])));
 let vocabularySupported = config.liveVocabulary;
+// Interpreting needs no reasoning: minimal thinking cuts the pause before the voice starts.
+// Dropped automatically if the model rejects the field.
+let minimalThinkingSupported = true;
 
-function liveConfig(opts: LiveOptions, handle: string | undefined, withVocabulary: boolean): LiveConnectConfig {
+interface Features {
+  vocabulary: boolean;
+  minimalThinking: boolean;
+}
+
+function liveConfig(opts: LiveOptions, handle: string | undefined, features: Features): LiveConnectConfig {
+  const withVocabulary = features.vocabulary;
   return {
     responseModalities: [Modality.AUDIO],
+    ...(features.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: opts.voice } } },
     systemInstruction: liveInstruction(opts.lang),
     inputAudioTranscription: withVocabulary ? { customVocabulary: VOCABULARY } : {},
@@ -72,7 +83,8 @@ function liveConfig(opts: LiveOptions, handle: string | undefined, withVocabular
     realtimeInputConfig: {
       automaticActivityDetection: {
         startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-        endOfSpeechSensitivity: opts.pace === 'fast' ? EndSensitivity.END_SENSITIVITY_HIGH : EndSensitivity.END_SENSITIVITY_LOW,
+        // Only the unhurried pace waits through long pauses; the others hand over quickly
+        endOfSpeechSensitivity: opts.pace === 'patient' ? EndSensitivity.END_SENSITIVITY_LOW : EndSensitivity.END_SENSITIVITY_HIGH,
         silenceDurationMs: PACE_SILENCE_MS[opts.pace],
         prefixPaddingMs: 150,
       },
@@ -86,7 +98,7 @@ function liveConfig(opts: LiveOptions, handle: string | undefined, withVocabular
 }
 
 async function openGemini(opts: LiveOptions, events: UpstreamEvents, handle?: string): Promise<Upstream> {
-  const attempt = async (withVocabulary: boolean): Promise<Session> => {
+  const attempt = async (features: Features): Promise<Session> => {
     let opened = false;
     let failEarly: (err: Error) => void = () => {};
     const early = new Promise<never>((_, reject) => {
@@ -95,7 +107,7 @@ async function openGemini(opts: LiveOptions, events: UpstreamEvents, handle?: st
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('live connect timeout')), 10_000));
     const connecting = ai.live.connect({
       model: config.models.live,
-      config: liveConfig(opts, handle, withVocabulary),
+      config: liveConfig(opts, handle, features),
       callbacks: {
         onmessage: (msg: LiveServerMessage) => handleMessage(msg, events),
         onerror: (e: ErrorEvent) => console.warn('[live] upstream error:', e?.message),
@@ -112,13 +124,15 @@ async function openGemini(opts: LiveOptions, events: UpstreamEvents, handle?: st
   };
 
   let session: Session;
+  const features: Features = { vocabulary: vocabularySupported, minimalThinking: minimalThinkingSupported };
   try {
-    session = await attempt(vocabularySupported);
+    session = await attempt(features);
   } catch (err) {
-    if (!vocabularySupported) throw err;
-    console.warn('[live] connect with vocabulary failed, retrying without:', (err as Error).message);
+    if (!features.vocabulary && !features.minimalThinking) throw err;
+    console.warn('[live] connect with optional features failed, retrying without:', (err as Error).message);
     vocabularySupported = false;
-    session = await attempt(false);
+    minimalThinkingSupported = false;
+    session = await attempt({ vocabulary: false, minimalThinking: false });
   }
 
   return {

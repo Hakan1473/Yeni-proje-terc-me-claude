@@ -16,7 +16,6 @@ import {
 import { memo, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { describeDrugMismatch } from '../../shared/medical/drugcheck';
 import { DRUGS } from '../../shared/medical/lexicon';
-import { describeNumberCheck } from '../../shared/numbers';
 import { TUTORIAL_VIDEOS } from '../../shared/tutorials';
 import { escapeRegExp } from '../../shared/text';
 import type { ConversationItem, Language, TutorialKind, Turn } from '../../shared/types';
@@ -252,15 +251,6 @@ const TurnCard = memo(function TurnCard({
           </button>
         </div>
       ) : null}
-
-      {turn.numberCheck && (
-        <div className="mt-2.5 rounded-[12px] bg-sys-orange/12 text-[13px] leading-snug px-3 py-2 flex items-start gap-2">
-          <TriangleAlert className="w-4 h-4 text-sys-orange shrink-0 mt-px" strokeWidth={2.25} />
-          <span className="flex-1">
-            <span className="font-semibold">Sayıları kontrol edin.</span> {describeNumberCheck(turn.numberCheck)}.
-          </span>
-        </div>
-      )}
 
       {turn.drugCheck?.map((m) => (
         <div

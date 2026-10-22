@@ -21,6 +21,7 @@ export function DockKey({
   tone,
   disabled,
   pressed,
+  weight,
 }: {
   icon: PhosphorIcon;
   label: string;
@@ -28,11 +29,12 @@ export function DockKey({
   tone?: 'danger' | 'accent';
   disabled?: boolean;
   pressed?: boolean;
+  weight?: 'bold' | 'duotone' | 'fill';
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-pressed={pressed} data-tone={tone} className="dock-key cursor-pointer disabled:cursor-default">
       <span className="dock-key-face">
-        <Icon size={22} weight={tone ? 'fill' : 'duotone'} />
+        <Icon size={22} weight={weight ?? (tone ? 'fill' : 'duotone')} />
       </span>
       <span className="dock-key-label">{label}</span>
     </button>

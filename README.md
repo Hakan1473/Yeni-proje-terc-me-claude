@@ -8,11 +8,12 @@ Hemşire ve sağlık personeli için yabancı dildeki hastalarla **gerçek zaman
 
 - **Gemini Live** ile sesten sese tercüme. Ses ikili (binary) olarak, düşük gecikmeyle iletilir; dil veya ses değişiminde kesinti olmaz, bağlantı koparsa bağlam korunur.
 - **Doğru konuşmacı ayrımı**: Kürtçe, Azerice, Türkmence ve Özbekçe dahil 59 dilde "Türkçe mi, hastanın dili mi?" sınıflandırması.
-- **Anlık anamnez**: şikâyetler, ilaçlar (etken maddesi, dozu ve sıklığıyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar, aile öyküsü, istekler ve talimatlar. Önce yerel çıkarım yapılır, ardından yapay zekâ doğrular. Her bulgunun konuşmadaki dayanağı gösterilir. Hastanın söylediği ilaç adı ile çeviri farklıysa uyarı verilir; yanlış bir madde sola kaydırılarak silinir ve yapay zekâ onu tekrar eklemez.
+- **Anlık anamnez**: şikâyetler, ilaçlar (etken maddesi, dozu ve sıklığıyla), alerjiler, kronik hastalıklar, ameliyatlar, alışkanlıklar, aile öyküsü, istekler ve talimatlar. Önce yerel çıkarım yapılır, ardından yapay zekâ tüm görüşmeyi okuyup doğrular. Doğrulanan bilgi sabit kalır: sonraki analizler yalnızca ekler veya ayrıntı katar; bir madde ancak hasta açıkça düzeltirse ya da hemşire silerse kalkar. Her bulgunun konuşmadaki dayanağı gösterilir. Hastanın söylediği ilaç adı ile çeviri farklıysa uyarı verilir; yanlış bir madde sola kaydırılarak silinir ve yapay zekâ onu tekrar eklemez.
 - **Hastane sistemiyle bağlantı yoktur**: uygulama HBYS veya başka bir hastane sistemine erişmez, veri göndermez. Kopyala düğmesi yalnızca metni cihazın panosuna alır.
 - **Tıbbi bilgi kartı**: anamnezdeki ilaca, hastalığa veya belirtiye dokunulduğunda kısa bir kart açılır: ne olduğu, etken madde, ilaç grubu ve hemşirenin dikkat etmesi gerekenler. Kartlar arka planda önceden hazırlanır ve cihazda saklanır, bu yüzden anında açılır.
-- **Sayı tutarlılık denetimi**: "500 mg" çeviride "50 mg" olursa uyarır.
+- **İlaç adı teyidi**: hastanın söylediği ilaç ile çevirideki ilaç farklıysa kartta uyarı çıkar.
 - **Hastaya Göster**: ekranı ikiye bölen, üst yarısı hastaya dönük karşılıklı görünüm. Konuşma başlamadan hasta tarafında, seçilen dilde ne yapacağını anlatan bir açıklama gösterilir.
+- **Anında açılış**: ana ekrana eklenen uygulama önbellekten açılır (sunucu uyanmayı beklemez); iPhone'larda siyah ekran yerine açılış görseli gösterilir.
 - **Tanıtım filmi**: uygulama ilk kez açıldığında bir kez gösterilir (`public/videos/intro.mp4` / `.webm`); sonra Ayarlar → Rehber'den yeniden izlenebilir.
 - Çağrı butonu ve Triflow **eğitim videoları**, konuşma özeti, geçmiş (yalnızca cihazda), yazarak çeviri, açık/koyu/otomatik görünüm.
 
