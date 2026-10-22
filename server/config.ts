@@ -32,6 +32,11 @@ export const config = {
     smart: process.env.SMART_MODEL || 'gemini-3.8-flash',
     tts: process.env.TTS_MODEL || 'gemini-3.8-flash-lite-tts',
     ttsFallback: process.env.TTS_FALLBACK_MODEL || 'gemini-3.8-flash-tts',
+    /** Tried after the requested models when those are overloaded or out of quota. */
+    fallbacks: (process.env.FALLBACK_MODELS || 'gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite')
+      .split(',')
+      .map((m) => m.trim())
+      .filter(Boolean),
   },
   limits: {
     /** Concurrent live interpreter sessions per client IP and in total. */

@@ -190,24 +190,22 @@ JSON: {"known":true,"summary":"","points":[],"redFlags":[],"nursing":[]}`,
 };
 
 const list = { type: Type.ARRAY, items: { type: Type.STRING } };
-const SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    known: { type: Type.BOOLEAN },
-    summary: { type: Type.STRING },
-    activeIngredient: { type: Type.STRING },
-    drugClass: { type: Type.STRING },
-    points: list,
-    sideEffects: list,
-    redFlags: list,
-    nursing: list,
-    crossReactions: list,
-    foodsAndDrinks: list,
-    avoidList: list,
-    reactionSigns: list,
-  },
-  required: ['known', 'summary'],
+const str = { type: Type.STRING };
+
+// Every section of a card type is required, so the model cannot leave a card half empty
+const FIELDS: Record<CardType, Record<string, object>> = {
+  allergy: { drugClass: str, activeIngredient: str, crossReactions: list, foodsAndDrinks: list, avoidList: list, reactionSigns: list, nursing: list },
+  drug: { activeIngredient: str, drugClass: str, points: list, sideEffects: list, nursing: list },
+  condition: { points: list, redFlags: list, nursing: list },
+  symptom: { points: list, redFlags: list, nursing: list },
+  procedure: { points: list, redFlags: list, nursing: list },
 };
+
+function schemaFor(type: CardType) {
+  const fields = FIELDS[type];
+  const required = ['known', 'summary', ...Object.keys(fields).filter((k) => k !== 'activeIngredient')];
+  return { type: Type.OBJECT, properties: { known: { type: Type.BOOLEAN }, summary: str, ...fields }, required };
+}
 
 // ───────────────────────── verified data ─────────────────────────
 
@@ -431,6 +429,20 @@ async function encyclopedia(term: string, type: CardType): Promise<WebResult | n
   return fetchEnWikiExtract(findDrug(term)?.generic ?? term.replace(/\s*\([^)]*\)/g, '').trim());
 }
 
+/** Fill sections the model left empty with verified reference data (allergy cards). */
+function complete(card: TermInfo, term: string, kind: TermKind, type: CardType, category: FactCategory | undefined): TermInfo {
+  if (type !== 'allergy') return card;
+  const ref = referenceCard(term, kind, type, category, null);
+  return {
+    ...card,
+    crossReactions: card.crossReactions ?? ref?.crossReactions,
+    foodsAndDrinks: card.foodsAndDrinks ?? ref?.foodsAndDrinks,
+    avoidList: card.avoidList ?? ref?.avoidList,
+    reactionSigns: card.reactionSigns ?? REACTION_SIGNS,
+    nursing: card.nursing ?? ALLERGY_NURSING,
+  };
+}
+
 /**
  * Build the card for a term. Returns null when nothing verified can be said
  * (the AI is unreachable and the term is not in the reference data).
@@ -452,16 +464,15 @@ export async function researchTermCard(term: string, kind: TermKind, category?: 
     models: [config.models.fast, config.models.smart],
     system,
     input,
-    timeoutMs: 12000,
+    timeoutMs: 15000,
     temperature: 0.1,
-    minimalThinking: true,
   });
   const fromWeb = web && toCard(web.data, term, kind, type, category);
   if (fromWeb) {
     const sources = web.sources
       .map((s: WebSource) => ({ title: clean(s.title, 80), url: s.url }))
       .filter((s) => s.title && /^https:\/\//.test(s.url));
-    return { ...fromWeb, origin: 'web', sources: orUndefined(sources) };
+    return complete({ ...fromWeb, origin: 'web', sources: orUndefined(sources) }, term, kind, type, category);
   }
 
   // 2. Model knowledge, anchored on an encyclopedia extract when there is one
@@ -470,13 +481,13 @@ export async function researchTermCard(term: string, kind: TermKind, category?: 
     models: [config.models.fast, config.models.smart],
     system,
     input: { ...input, encyclopedia: extract ? { title: extract.title, text: extract.extract } : undefined },
-    schema: SCHEMA,
-    timeoutMs: 9000,
+    schema: schemaFor(type),
+    // A card is read by a nurse at the bedside: let the model think (cards load in the background)
+    timeoutMs: 15000,
     temperature: 0.1,
-    minimalThinking: true,
   });
   const fromModel = known && toCard(known, term, kind, type, category);
-  if (fromModel) return { ...fromModel, origin: 'ai', sources: extract ? [{ title: extract.title, url: extract.url }] : undefined };
+  if (fromModel) return complete({ ...fromModel, origin: 'ai', sources: extract ? [{ title: extract.title, url: extract.url }] : undefined }, term, kind, type, category);
 
   // 3. AI unreachable: verified reference data only
   return referenceCard(term, kind, type, category, extract);

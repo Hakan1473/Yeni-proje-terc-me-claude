@@ -8,7 +8,6 @@ import {
   Modality,
   type Session,
   StartSensitivity,
-  ThinkingLevel,
 } from '@google/genai';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { getLanguage } from '../shared/languages';
@@ -62,20 +61,14 @@ interface Upstream {
 // dropped automatically if the model rejects the field.
 const VOCABULARY = Array.from(new Set(DRUGS.map((d) => d.name).concat(['Triflow', 'Clexane', 'serum', 'damar yolu', 'tansiyon'])));
 let vocabularySupported = config.liveVocabulary;
-// Interpreting needs no reasoning: minimal thinking cuts the pause before the voice starts.
-// Dropped automatically if the model rejects the field.
-let minimalThinkingSupported = true;
-
 interface Features {
   vocabulary: boolean;
-  minimalThinking: boolean;
 }
 
 function liveConfig(opts: LiveOptions, handle: string | undefined, features: Features): LiveConnectConfig {
   const withVocabulary = features.vocabulary;
   return {
     responseModalities: [Modality.AUDIO],
-    ...(features.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: opts.voice } } },
     systemInstruction: liveInstruction(opts.lang),
     inputAudioTranscription: withVocabulary ? { customVocabulary: VOCABULARY } : {},
@@ -124,15 +117,13 @@ async function openGemini(opts: LiveOptions, events: UpstreamEvents, handle?: st
   };
 
   let session: Session;
-  const features: Features = { vocabulary: vocabularySupported, minimalThinking: minimalThinkingSupported };
   try {
-    session = await attempt(features);
+    session = await attempt({ vocabulary: vocabularySupported });
   } catch (err) {
-    if (!features.vocabulary && !features.minimalThinking) throw err;
-    console.warn('[live] connect with optional features failed, retrying without:', (err as Error).message);
+    if (!vocabularySupported) throw err;
+    console.warn('[live] connect with vocabulary failed, retrying without:', (err as Error).message);
     vocabularySupported = false;
-    minimalThinkingSupported = false;
-    session = await attempt({ vocabulary: false, minimalThinking: false });
+    session = await attempt({ vocabulary: false });
   }
 
   return {

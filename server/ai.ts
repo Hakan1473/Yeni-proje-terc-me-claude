@@ -34,37 +34,66 @@ interface JsonRequest {
   minimalThinking?: boolean;
 }
 
-/** Models that answered 429 / RESOURCE_EXHAUSTED rest until this time, so the next model answers at once. */
-const quotaCooldown = new Map<string, number>();
-const COOLDOWN_MS = 60_000;
+/**
+ * Model health, learned from the API's answers:
+ *   429 (quota) rests a model for a minute, 503 (overloaded) for 20 s, so the
+ *   next model in the chain answers at once; a model that rejects the minimal
+ *   thinking level is remembered and gets "low" instead.
+ */
+const cooldown = new Map<string, number>();
+const noMinimalThinking = new Set<string>();
+let groundingUntil = 0;
 
-function isQuotaError(msg: string): boolean {
-  return /429|RESOURCE_EXHAUSTED|quota/i.test(msg);
+function rest(model: string, msg: string) {
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(msg)) cooldown.set(model, Date.now() + 60_000);
+  else if (/503|UNAVAILABLE|overloaded|high demand/i.test(msg)) cooldown.set(model, Date.now() + 20_000);
 }
 
-/** Models to try in order: those not resting first; if all rest, the one that recovers soonest. */
+/** The requested models, then the general fallbacks; resting ones last, never none. */
 function modelsToTry(models: string[]): string[] {
-  const unique = Array.from(new Set(models));
+  const unique = Array.from(new Set([...models, ...config.models.fallbacks]));
   const now = Date.now();
-  const ready = unique.filter((m) => (quotaCooldown.get(m) ?? 0) <= now);
-  if (ready.length) return ready;
-  return [...unique].sort((a, b) => (quotaCooldown.get(a) ?? 0) - (quotaCooldown.get(b) ?? 0)).slice(0, 1);
+  const ready = unique.filter((m) => (cooldown.get(m) ?? 0) <= now);
+  const resting = unique.filter((m) => !ready.includes(m)).sort((a, b) => (cooldown.get(a) ?? 0) - (cooldown.get(b) ?? 0));
+  return [...ready, ...resting.slice(0, 1)];
 }
 
-/** One model call with a timeout; records quota errors. Returns null on failure. */
-async function callModel(model: string, timeoutMs: number, run: (signal: AbortSignal) => Promise<string | undefined>, label: string) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await run(controller.signal);
-  } catch (err) {
-    const msg = (err as Error).message || '';
-    console.warn(`[ai] ${label} ${model} failed:`, msg.slice(0, 200));
-    if (isQuotaError(msg)) quotaCooldown.set(model, Date.now() + COOLDOWN_MS);
-    return null;
-  } finally {
-    clearTimeout(timer);
+function thinkingFor(model: string, minimal?: boolean) {
+  if (!minimal) return {};
+  return { thinkingConfig: { thinkingLevel: noMinimalThinking.has(model) ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL } };
+}
+
+/** One model call with a timeout. Returns the text, or null on failure (recorded for the next call). */
+async function callModel(
+  model: string,
+  timeoutMs: number,
+  minimal: boolean | undefined,
+  run: (signal: AbortSignal, thinking: object) => Promise<string | undefined>,
+  label: string,
+): Promise<string | null | undefined> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await run(controller.signal, thinkingFor(model, minimal));
+    } catch (err) {
+      const msg = (err as Error).message || '';
+      // Some models only accept "low": remember it and retry this model once
+      if (attempt === 0 && minimal && /thinking level/i.test(msg) && !noMinimalThinking.has(model)) {
+        noMinimalThinking.add(model);
+        continue;
+      }
+      console.warn(`[ai] ${label} ${model} failed:`, msg.slice(0, 160));
+      if (label === 'grounded' && /429|RESOURCE_EXHAUSTED|quota/i.test(msg)) {
+        // Search grounding has its own quota (none on the free tier): skip it for a while
+        groundingUntil = Date.now() + 10 * 60_000;
+      } else rest(model, msg);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return null;
 }
 
 /** Structured generation with a per-model timeout and a model fallback chain. */
@@ -73,7 +102,8 @@ export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
     const text = await callModel(
       model,
       req.timeoutMs,
-      async (signal) =>
+      req.minimalThinking,
+      async (signal, thinking) =>
         (
           await ai.models.generateContent({
             model,
@@ -83,7 +113,7 @@ export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
               responseMimeType: 'application/json',
               responseSchema: req.schema,
               temperature: req.temperature ?? 0.2,
-              ...(req.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
+              ...thinking,
               abortSignal: signal,
             },
           })
@@ -107,12 +137,15 @@ export interface WebSource {
  * and the reply is parsed leniently. Returns the pages the answer was built on.
  */
 export async function generateGroundedJson<T>(req: Omit<JsonRequest, 'schema'>): Promise<{ data: T; sources: WebSource[] } | null> {
-  for (const model of modelsToTry(req.models)) {
+  if (Date.now() < groundingUntil) return null;
+  for (const model of modelsToTry(req.models).slice(0, 2)) {
+    if (Date.now() < groundingUntil) return null;
     let sources: WebSource[] = [];
     const text = await callModel(
       model,
       req.timeoutMs,
-      async (signal) => {
+      req.minimalThinking,
+      async (signal, thinking) => {
         const res = await ai.models.generateContent({
           model,
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
@@ -120,7 +153,7 @@ export async function generateGroundedJson<T>(req: Omit<JsonRequest, 'schema'>):
             systemInstruction: req.system,
             tools: [{ googleSearch: {} }],
             temperature: req.temperature ?? 0.2,
-            ...(req.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
+            ...thinking,
             abortSignal: signal,
           },
         });
