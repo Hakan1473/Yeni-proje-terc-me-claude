@@ -126,9 +126,11 @@ export function mountRoutes(app: Express): void {
         required: ['sourceLanguage', 'translation'],
       },
       timeoutMs: 7000,
+      minimalThinking: true,
     });
     if (!out?.translation) {
-      res.json(mockTranslate(text, lang, hint));
+      // Never pass off an untranslated text as a translation: the client shows the failure
+      res.status(502).json({ error: 'translation_failed' });
       return;
     }
     // The model's own language decision, cross-checked against both texts
@@ -328,19 +330,25 @@ export function mountRoutes(app: Express): void {
       return;
     }
     if (config.mock) {
-      res.json(mockTerm(term, kind));
+      res.json(mockTerm(term, kind, category));
       return;
     }
     try {
       const info = await researchTermCard(term, kind, category);
-      if (info && info.known) {
+      if (!info) {
+        // Nothing verified to show: the card offers a retry instead of filler text
+        res.status(503).json({ error: 'term_unavailable' });
+        return;
+      }
+      // A reference card stands in while the AI is unreachable; only full cards are kept
+      if (info.origin === 'web' || info.origin === 'ai') {
         if (termCache.size >= TERM_CACHE_MAX) termCache.delete(termCache.keys().next().value as string);
         termCache.set(cacheKey, info);
       }
       res.json(info);
     } catch (err) {
-      console.warn('[term] research failed, falling back:', (err as Error).message);
-      res.json(mockTerm(term, kind));
+      console.warn('[term] research failed:', (err as Error).message);
+      res.status(503).json({ error: 'term_unavailable' });
     }
   });
 

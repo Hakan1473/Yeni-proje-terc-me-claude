@@ -30,50 +30,68 @@ interface JsonRequest {
   schema: Schema;
   timeoutMs: number;
   temperature?: number;
+  /** Quick lookups (translation, term cards) need no reasoning; clinical analysis keeps the model's default. */
+  minimalThinking?: boolean;
 }
 
-/** Models that returned 429 / RESOURCE_EXHAUSTED: avoid retrying them until cooldown expires. */
+/** Models that answered 429 / RESOURCE_EXHAUSTED rest until this time, so the next model answers at once. */
 const quotaCooldown = new Map<string, number>();
+const COOLDOWN_MS = 60_000;
+
+function isQuotaError(msg: string): boolean {
+  return /429|RESOURCE_EXHAUSTED|quota/i.test(msg);
+}
+
+/** Models to try in order: those not resting first; if all rest, the one that recovers soonest. */
+function modelsToTry(models: string[]): string[] {
+  const unique = Array.from(new Set(models));
+  const now = Date.now();
+  const ready = unique.filter((m) => (quotaCooldown.get(m) ?? 0) <= now);
+  if (ready.length) return ready;
+  return [...unique].sort((a, b) => (quotaCooldown.get(a) ?? 0) - (quotaCooldown.get(b) ?? 0)).slice(0, 1);
+}
+
+/** One model call with a timeout; records quota errors. Returns null on failure. */
+async function callModel(model: string, timeoutMs: number, run: (signal: AbortSignal) => Promise<string | undefined>, label: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await run(controller.signal);
+  } catch (err) {
+    const msg = (err as Error).message || '';
+    console.warn(`[ai] ${label} ${model} failed:`, msg.slice(0, 200));
+    if (isQuotaError(msg)) quotaCooldown.set(model, Date.now() + COOLDOWN_MS);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Structured generation with a per-model timeout and a model fallback chain. */
 export async function generateJson<T>(req: JsonRequest): Promise<T | null> {
-  const models = Array.from(new Set(req.models));
-  const timeoutMs = Math.max(req.timeoutMs, 14000);
-  const now = Date.now();
-
-  for (const model of models) {
-    const cooledUntil = quotaCooldown.get(model);
-    if (cooledUntil && now < cooledUntil) {
-      continue;
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
-        config: {
-          systemInstruction: req.system,
-          responseMimeType: 'application/json',
-          responseSchema: req.schema,
-          temperature: req.temperature ?? 0.1,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-          abortSignal: controller.signal,
-        },
-      });
-      const parsed = parseJson<T>(res.text);
-      if (parsed) return parsed;
-    } catch (err) {
-      const msg = (err as Error).message || '';
-      console.warn(`[ai] ${model} failed:`, msg);
-      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-        // Cooldown for 5 minutes so we don't spam an exhausted quota
-        quotaCooldown.set(model, Date.now() + 5 * 60 * 1000);
-      }
-    } finally {
-      clearTimeout(timer);
-    }
+  for (const model of modelsToTry(req.models)) {
+    const text = await callModel(
+      model,
+      req.timeoutMs,
+      async (signal) =>
+        (
+          await ai.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
+            config: {
+              systemInstruction: req.system,
+              responseMimeType: 'application/json',
+              responseSchema: req.schema,
+              temperature: req.temperature ?? 0.2,
+              ...(req.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
+              abortSignal: signal,
+            },
+          })
+        ).text,
+      'json',
+    );
+    const parsed = parseJson<T>(text ?? undefined);
+    if (parsed) return parsed;
   }
   return null;
 }
@@ -88,40 +106,39 @@ export interface WebSource {
  * combined with a response schema, so the instruction spells out the JSON shape
  * and the reply is parsed leniently. Returns the pages the answer was built on.
  */
-export async function generateGroundedJson<T>(
-  req: Omit<JsonRequest, 'schema'>,
-): Promise<{ data: T; sources: WebSource[] } | null> {
-  for (const model of req.models) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), req.timeoutMs);
-    try {
-      const res = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
-        config: {
-          systemInstruction: req.system,
-          tools: [{ googleSearch: {} }],
-          temperature: req.temperature ?? 0.2,
-          abortSignal: controller.signal,
-        },
-      });
-      const data = parseJson<T>(res.text);
-      if (!data) continue;
-      const seen = new Set<string>();
-      const sources: WebSource[] = [];
-      for (const chunk of res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []) {
-        const title = chunk.web?.title?.trim();
-        const url = chunk.web?.uri;
-        if (!title || !url || seen.has(title)) continue;
-        seen.add(title);
-        sources.push({ title, url });
-      }
-      return { data, sources: sources.slice(0, 4) };
-    } catch (err) {
-      console.warn(`[ai] grounded ${model} failed:`, (err as Error).message);
-    } finally {
-      clearTimeout(timer);
-    }
+export async function generateGroundedJson<T>(req: Omit<JsonRequest, 'schema'>): Promise<{ data: T; sources: WebSource[] } | null> {
+  for (const model of modelsToTry(req.models)) {
+    let sources: WebSource[] = [];
+    const text = await callModel(
+      model,
+      req.timeoutMs,
+      async (signal) => {
+        const res = await ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [{ text: JSON.stringify(req.input) }] }],
+          config: {
+            systemInstruction: req.system,
+            tools: [{ googleSearch: {} }],
+            temperature: req.temperature ?? 0.2,
+            ...(req.minimalThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } } : {}),
+            abortSignal: signal,
+          },
+        });
+        const seen = new Set<string>();
+        sources = [];
+        for (const chunk of res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []) {
+          const title = chunk.web?.title?.trim();
+          const url = chunk.web?.uri;
+          if (!title || !url || seen.has(title)) continue;
+          seen.add(title);
+          sources.push({ title, url });
+        }
+        return res.text;
+      },
+      'grounded',
+    );
+    const data = parseJson<T>(text ?? undefined);
+    if (data) return { data, sources: sources.slice(0, 4) };
   }
   return null;
 }

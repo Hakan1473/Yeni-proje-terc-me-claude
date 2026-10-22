@@ -1,67 +1,71 @@
 import {
-  AlertTriangle,
+  Activity,
   Ban,
+  CircleAlert,
   CircleCheck,
   FlaskConical,
   Globe,
-  Layers,
+  HeartPulse,
   type LucideIcon,
+  Pill,
   Quote,
   RefreshCw,
+  Scissors,
   ShieldAlert,
+  Siren,
   Sparkles,
-  Stethoscope,
   Tag,
-  TriangleAlert,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import type { TermInfo, TermKind, TermQuery } from '../../shared/medical/terms';
-import type { Fact, FactCategory } from '../../shared/types';
+import { type CardType, cardTypeOf, type TermInfo, type TermQuery } from '../../shared/medical/terms';
+import type { Fact } from '../../shared/types';
 import { cachedTerm, fetchTerm } from '../lib/terms';
 import { Sheet } from './ui';
 
-const CATEGORY_LABEL: Record<FactCategory, string> = {
-  allergy: 'Alerji & Çapraz Reaksiyon',
-  medication: 'İlaç Bilgi Kartı',
-  chronic: 'Kronik Hastalık Bilgi Kartı',
-  complaint: 'Şikâyet & Belirti Bilgi Kartı',
-  surgery: 'Cerrahi İşlem Bilgi Kartı',
-  family: 'Aile Öyküsü & Kalıtsal Risk',
-  habit: 'Alışkanlık & Yaşam Tarzı',
-  need: 'Hasta Gereksinimi & Talep',
-  instruction: 'Klinik Talimat & Bilgilendirme',
+const TYPE: Record<CardType, { label: string; glyph: string; icon: LucideIcon }> = {
+  allergy: { label: 'Alerji kartı', glyph: 'bg-sys-red', icon: ShieldAlert },
+  drug: { label: 'İlaç kartı', glyph: 'bg-sys-green', icon: Pill },
+  condition: { label: 'Hastalık kartı', glyph: 'bg-sys-purple', icon: HeartPulse },
+  symptom: { label: 'Şikâyet ve belirti kartı', glyph: 'bg-sys-pink', icon: Activity },
+  procedure: { label: 'Ameliyat ve işlem kartı', glyph: 'bg-sys-teal', icon: Scissors },
 };
 
-const KIND_LABEL: Record<TermKind, string> = {
-  drug: 'İlaç',
-  condition: 'Hastalık',
-  symptom: 'Belirti',
-  procedure: 'Cerrahi işlem',
-  allergen: 'Alerjen',
-};
-
-const POINTS_TITLE: Record<TermKind, string> = {
+// Titles of the shared fields, which mean something different on each card
+const POINTS_TITLE: Record<CardType, string> = {
+  allergy: '',
   drug: 'Kullanım alanları',
-  condition: 'Tipik bulgular & Riskler',
-  symptom: 'Nasıl görülür & Özellikleri',
-  procedure: 'Neden yapılır & Amacı',
-  allergen: 'Bulunduğu yerler & Kaynaklar',
+  condition: 'Tipik bulgular',
+  symptom: 'Olası nedenler',
+  procedure: 'Ne için yapılır',
+};
+const RED_FLAGS_TITLE: Record<CardType, string> = {
+  allergy: '',
+  drug: '',
+  condition: 'Hemen bildirilecek belirtiler',
+  symptom: 'Acil uyarı belirtileri',
+  procedure: 'Komplikasyon belirtileri',
 };
 
 function useTerm(q: TermQuery) {
   const [info, setInfo] = useState<TermInfo | null>(() => cachedTerm(q));
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
+    setLoading(true);
+    // One quiet retry before showing an error: a web lookup can fail on a slow network
     fetchTerm(q)
       .catch(() => fetchTerm(q))
       .then(setInfo)
-      .catch(() => setFailed(true));
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
   }, [q]);
   useEffect(() => {
     if (!info) load();
-  }, [info, load]);
-  return { info, failed, retry: load };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: load once per term
+  }, []);
+  return { info, failed, loading, retry: load };
 }
 
 function Skeleton() {
@@ -93,64 +97,164 @@ function Skeleton() {
 
 function Row({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <Icon className="w-[18px] h-[18px] text-label-2 shrink-0" strokeWidth={2} />
+    <div className="flex items-start gap-3 px-4 py-3">
+      <Icon className="w-[18px] h-[18px] text-label-2 shrink-0 mt-px" strokeWidth={2} />
       <span className="text-[15px] text-label-2 shrink-0">{label}</span>
       <span className="ml-auto text-[15px] font-medium text-right">{value}</span>
     </div>
   );
 }
 
+function Chips({ title, items }: { title: string; items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <section>
+      <h3 className="px-1 mb-2 text-[13px] font-medium text-label-2">{title}</h3>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((p) => (
+          <span key={p} className="px-3 py-1.5 rounded-full bg-fill text-[14px] leading-tight">
+            {p}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+type Tone = 'red' | 'orange' | 'neutral';
+const TONE: Record<Tone, { box: string; title: string; dot: string }> = {
+  red: { box: 'bg-sys-red/8', title: 'text-sys-red', dot: 'bg-sys-red' },
+  orange: { box: 'bg-sys-orange/10', title: 'text-sys-orange', dot: 'bg-sys-orange' },
+  neutral: { box: 'bg-fill-2', title: 'text-label', dot: 'bg-label-3' },
+};
+
+function ListBox({ title, icon: Icon, items, tone, children }: { title: string; icon: LucideIcon; items?: string[]; tone: Tone; children?: (item: string) => React.ReactNode }) {
+  if (!items?.length) return null;
+  const t = TONE[tone];
+  return (
+    <section className={`rounded-[16px] px-4 py-3.5 ${t.box}`}>
+      <h3 className={`mb-2.5 flex items-center gap-2 text-[14px] font-semibold ${t.title}`}>
+        <Icon className="w-4 h-4 shrink-0" strokeWidth={2.3} />
+        {title}
+      </h3>
+      <ul className="space-y-2">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2.5 text-[14.5px] leading-snug">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-[7px] ${t.dot}`} />
+            <span className="flex-1 min-w-0">{children ? children(item) : item}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** "Sefalosporinler (Sefazolin) — düşük-orta risk": the drug, with its risk level as a badge. */
+function CrossReaction({ item }: { item: string }) {
+  const m = item.match(/^(.*?)\s+[—–-]\s+(\S[^—–]*risk\S*)$/iu);
+  if (!m) return <>{item}</>;
+  const level = m[2].toLocaleLowerCase('tr');
+  const tone = /yüksek/.test(level) ? 'bg-sys-red/15 text-sys-red' : /orta/.test(level) ? 'bg-sys-orange/15 text-sys-orange' : 'bg-fill text-label-2';
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span>{m[1]}</span>
+      <span className={`px-2 py-0.5 rounded-full text-[11.5px] font-semibold ${tone}`}>{m[2].replace(/\s*risk\s*/iu, ' risk').trim()}</span>
+    </span>
+  );
+}
+
+function Nursing({ items }: { items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <section className="rounded-[16px] bg-accent-soft px-4 py-3.5">
+      <h3 className="mb-2 text-[13px] font-semibold text-accent-ink">Hemşire için</h3>
+      <ul className="space-y-2">
+        {items.map((n) => (
+          <li key={n} className="flex items-start gap-2 text-[15px] leading-snug">
+            <CircleCheck className="w-[17px] h-[17px] text-accent shrink-0 mt-[2px]" strokeWidth={2.1} />
+            <span>{n}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AllergyCard({ info }: { info: TermInfo }) {
+  return (
+    <>
+      {(info.drugClass || info.activeIngredient) && (
+        <div className="group-list">
+          {info.drugClass && <Row icon={Tag} label="Alerjen grubu" value={info.drugClass} />}
+          {info.activeIngredient && <Row icon={FlaskConical} label="Etken madde" value={info.activeIngredient} />}
+        </div>
+      )}
+      <ListBox title="Çapraz reaksiyon riski olan ilaçlar" icon={Pill} items={info.crossReactions} tone="orange">
+        {(item) => <CrossReaction item={item} />}
+      </ListBox>
+      <ListBox title="Kaçınılacak yiyecek ve içecekler" icon={UtensilsCrossed} items={info.foodsAndDrinks} tone="orange" />
+      <ListBox title="Diğer kaçınılacaklar" icon={Ban} items={info.avoidList} tone="neutral" />
+      <ListBox title="Reaksiyon belirtileri" icon={Siren} items={info.reactionSigns} tone="red" />
+    </>
+  );
+}
+
+function DrugCard({ info }: { info: TermInfo }) {
+  return (
+    <>
+      {(info.activeIngredient || info.drugClass) && (
+        <div className="group-list">
+          {info.activeIngredient && <Row icon={FlaskConical} label="Etken madde" value={info.activeIngredient} />}
+          {info.drugClass && <Row icon={Tag} label="İlaç grubu" value={info.drugClass} />}
+        </div>
+      )}
+      <Chips title={POINTS_TITLE.drug} items={info.points} />
+      <ListBox title="Önemli yan etkiler ve etkileşimler" icon={CircleAlert} items={info.sideEffects} tone="orange" />
+    </>
+  );
+}
+
+function ClinicalCard({ info, type }: { info: TermInfo; type: CardType }) {
+  return (
+    <>
+      <Chips title={POINTS_TITLE[type]} items={info.points} />
+      <ListBox title={RED_FLAGS_TITLE[type]} icon={Siren} items={info.redFlags} tone="red" />
+    </>
+  );
+}
+
 export function TermSheet({
   query,
   fact,
-  glyph,
-  icon: Icon,
   onClose,
 }: {
   query: TermQuery;
   fact?: Fact;
-  glyph: string;
-  icon: LucideIcon;
+  glyph?: string;
+  icon?: LucideIcon;
   onClose: () => void;
 }) {
-  const { info, failed, retry } = useTerm(query);
-  const isAllergy =
-    (fact?.category === 'allergy' && !fact?.negated) ||
-    query.category === 'allergy' ||
-    query.kind === 'allergen' ||
-    info?.category === 'allergy';
-
-  const kind = info?.kind ?? query.kind;
-  const category = (info?.category || fact?.category || query.category) as FactCategory | undefined;
-  const subtitle = isAllergy
-    ? 'Alerji & Çapraz Reaksiyon Kartı'
-    : category
-      ? CATEGORY_LABEL[category]
-      : KIND_LABEL[kind];
+  const { info, failed, loading, retry } = useTerm(query);
+  const type = cardTypeOf({ kind: query.kind, category: query.category ?? fact?.category });
+  const style = TYPE[type];
+  const Icon = style.icon;
 
   return (
     <Sheet
       onClose={onClose}
       width="sm:max-w-[480px]"
       leading={
-        <span className={`glyph w-10 h-10 rounded-[11px] ${isAllergy ? 'bg-sys-red' : glyph}`}>
-          {isAllergy ? <ShieldAlert className="w-[21px] h-[21px] text-white" strokeWidth={2.1} /> : <Icon className="w-[21px] h-[21px]" strokeWidth={2.1} />}
+        <span className={`glyph w-10 h-10 rounded-[11px] ${style.glyph}`}>
+          <Icon className="w-[21px] h-[21px]" strokeWidth={2.1} />
         </span>
       }
       title={query.term}
-      subtitle={subtitle}
+      subtitle={style.label}
     >
-      {/* ALLERGY EMERGENCY ALERT BANNER */}
-      {isAllergy && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-[16px] bg-sys-red/10 border border-sys-red/20 px-4 py-3 text-sys-red anim-fade shadow-sm">
-          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" strokeWidth={2.2} />
-          <div className="min-w-0 text-[13.5px] leading-snug">
-            <p className="font-semibold text-sys-red">ALERJİ & ÇAPRAZ REAKSİYON UYARISI</p>
-            <p className="mt-0.5 opacity-90">
-              Hasta bu etkene karşı alerji bildirdi. İlaç, antibiyotik veya gıda çapraz reaksiyonlarını uygulamadan önce mutlaka hekimle doğrulayın.
-            </p>
-          </div>
+      {type === 'allergy' && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-[14px] bg-sys-red/10 px-3.5 py-3 text-sys-red anim-fade">
+          <ShieldAlert className="w-5 h-5 shrink-0 mt-px" strokeWidth={2.1} />
+          <p className="text-[14px] leading-snug font-medium">Hasta bu maddeye alerjisi olduğunu bildirdi. İlaç ve beslenme planını hekimle doğrulayın.</p>
         </div>
       )}
 
@@ -158,12 +262,8 @@ export function TermSheet({
 
       {failed && !info && (
         <div className="py-8 flex flex-col items-center text-center gap-3 anim-fade">
-          <p className="text-[15px] text-label-2">Bilgi şu anda alınamadı.</p>
-          <button
-            type="button"
-            onClick={retry}
-            className="pressable btn-tinted h-9 px-4 rounded-full inline-flex items-center gap-1.5 text-[14px] font-medium cursor-pointer"
-          >
+          <p className="text-[15px] text-label-2 max-w-[300px]">Bilgi şu anda alınamadı. Bağlantı yavaş ya da yapay zekâ kotası geçici olarak dolu olabilir.</p>
+          <button type="button" onClick={retry} className="pressable btn-tinted h-9 px-4 rounded-full inline-flex items-center gap-1.5 text-[14px] font-medium cursor-pointer">
             <RefreshCw className="w-4 h-4" strokeWidth={2.25} />
             Tekrar dene
           </button>
@@ -178,146 +278,23 @@ export function TermSheet({
 
       {info?.known && (
         <div className="space-y-4 anim-fade">
-          {/* SUMMARY PARAGRAPH */}
-          <div className="rounded-[16px] bg-fill-2 p-3.5">
-            <p className="text-[16px] leading-[1.48] tracking-[-0.012em] pretty text-label">
-              {info.summary}
-            </p>
-          </div>
+          <p className="text-[17px] leading-[1.45] tracking-[-0.015em] pretty">{info.summary}</p>
+          {type === 'allergy' ? <AllergyCard info={info} /> : type === 'drug' ? <DrugCard info={info} /> : <ClinicalCard info={info} type={type} />}
+          <Nursing items={info.nursing} />
 
-          {/* ACTIVE INGREDIENT & DRUG / ALLERGEN CLASS */}
-          {(info.activeIngredient || info.drugClass) && (
-            <div className="group-list">
-              {info.activeIngredient && <Row icon={FlaskConical} label="Etken madde" value={info.activeIngredient} />}
-              {info.drugClass && (
-                <Row
-                  icon={Tag}
-                  label={isAllergy ? 'Alerjen sınıfı' : 'Farmakolojik grup'}
-                  value={info.drugClass}
-                />
-              )}
+          {info.origin === 'reference' && (
+            <div className="flex items-center gap-3 rounded-[14px] bg-fill-2 px-3.5 py-3">
+              <p className="flex-1 text-[13px] text-label-2 leading-snug">Yapay zekâya şu an ulaşılamadı; uygulamadaki doğrulanmış temel bilgi gösteriliyor.</p>
+              <button
+                type="button"
+                onClick={retry}
+                disabled={loading}
+                className="pressable btn-tinted h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-[13px] font-medium shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} strokeWidth={2.25} />
+                Yenile
+              </button>
             </div>
-          )}
-
-          {/* ALLERGY SPECIALIZED SECTION 1: CROSS REACTIONS */}
-          {isAllergy && info.crossReactions && info.crossReactions.length > 0 && (
-            <section className="rounded-[16px] border border-sys-orange/25 bg-sys-orange/10 p-4 anim-rise">
-              <header className="flex items-center gap-2 mb-2">
-                <Layers className="w-4 h-4 text-sys-orange shrink-0" strokeWidth={2.3} />
-                <h3 className="text-[14px] font-semibold text-sys-orange">
-                  Çapraz Reaksiyon Riski Olan Diğer İlaçlar / Benzer Türler
-                </h3>
-              </header>
-              <p className="text-[12.5px] text-label-2 mb-3 leading-snug">
-                Aynı moleküler yapıyı veya benzer proteinleri paylaşan, hastada benzer alerjik reaksiyon tetikleyebilecek türler:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {info.crossReactions.map((cr) => (
-                  <span
-                    key={cr}
-                    className="px-3 py-1.5 rounded-full bg-surface text-sys-orange border border-sys-orange/30 text-[13.5px] font-medium leading-tight shadow-xs flex items-center gap-1.5"
-                  >
-                    <TriangleAlert className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                    <span>{cr}</span>
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ALLERGY SPECIALIZED SECTION 2: AVOID LIST */}
-          {isAllergy && info.avoidList && info.avoidList.length > 0 && (
-            <section className="rounded-[16px] bg-sys-red/8 p-4 anim-rise border border-sys-red/15">
-              <header className="flex items-center gap-2 mb-2">
-                <Ban className="w-4 h-4 text-sys-red shrink-0" strokeWidth={2.3} />
-                <h3 className="text-[14px] font-semibold text-sys-red">
-                  Kaçınılması Gereken Maddeler & Preparatlar
-                </h3>
-              </header>
-              <ul className="space-y-1.5">
-                {info.avoidList.map((a) => (
-                  <li key={a} className="flex items-start gap-2 text-[13.5px] leading-snug text-label">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sys-red shrink-0 mt-1.5" />
-                    <span>{a}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* ALLERGY SPECIALIZED SECTION 3: REACTION & ANAPHYLAXIS SIGNS */}
-          {isAllergy && info.reactionSigns && info.reactionSigns.length > 0 && (
-            <section className="rounded-[16px] bg-fill p-4 anim-rise">
-              <header className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-sys-yellow shrink-0" strokeWidth={2.3} />
-                <h3 className="text-[13.5px] font-semibold text-label">
-                  Olası Reaksiyonlar & Anafilaksi Belirtileri
-                </h3>
-              </header>
-              <div className="flex flex-wrap gap-1.5">
-                {info.reactionSigns.map((rs) => (
-                  <span
-                    key={rs}
-                    className="px-2.5 py-1 rounded-full bg-surface text-[13px] leading-tight text-label-2 border border-black/5 dark:border-white/10"
-                  >
-                    {rs}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* GENERAL POINTS FOR NON-ALLERGY (DRUG USES, CHRONIC SIGNS, SYMPTOM CHARACTERISTICS) */}
-          {!isAllergy && info.points && info.points.length > 0 && (
-            <section>
-              <h3 className="px-1 mb-2 text-[13px] font-medium text-label-2">
-                {POINTS_TITLE[kind]}
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {info.points.map((p) => (
-                  <span key={p} className="px-3 py-1.5 rounded-full bg-fill text-[14px] leading-tight">
-                    {p}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* SPECIALIZED NURSING CARE & PROTOCOL */}
-          {info.nursing && info.nursing.length > 0 && (
-            <section
-              className={`rounded-[18px] p-4 ${
-                isAllergy ? 'bg-sys-red/10 border border-sys-red/25' : 'bg-accent-soft'
-              }`}
-            >
-              <header className="flex items-center gap-2 mb-2.5">
-                {isAllergy ? (
-                  <ShieldAlert className="w-[18px] h-[18px] text-sys-red" strokeWidth={2.3} />
-                ) : (
-                  <Stethoscope className="w-[18px] h-[18px] text-accent" strokeWidth={2.3} />
-                )}
-                <h3
-                  className={`text-[14px] font-semibold ${
-                    isAllergy ? 'text-sys-red' : 'text-accent-ink'
-                  }`}
-                >
-                  {isAllergy ? 'Hemşire Yaklaşımı & Acil Önlemler' : 'Hemşire için İzlem & Uygulama'}
-                </h3>
-              </header>
-              <ul className="space-y-2">
-                {info.nursing.map((n) => (
-                  <li key={n} className="flex items-start gap-2.5 text-[14.5px] leading-snug">
-                    <CircleCheck
-                      className={`w-[17px] h-[17px] shrink-0 mt-[2px] ${
-                        isAllergy ? 'text-sys-red' : 'text-accent'
-                      }`}
-                      strokeWidth={2.2}
-                    />
-                    <span className="text-label">{n}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
           )}
         </div>
       )}
@@ -351,18 +328,16 @@ export function TermSheet({
         </section>
       )}
 
+      {info?.known && (
       <p className="mt-6 flex items-center gap-1.5 text-[12px] text-label-3">
-        {info?.origin === 'web' ? (
-          <Globe className="w-3.5 h-3.5" strokeWidth={2} />
-        ) : (
-          <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
-        )}
+        {info?.origin === 'web' ? <Globe className="w-3.5 h-3.5 shrink-0" strokeWidth={2} /> : <Sparkles className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />}
         {info?.origin === 'web'
           ? 'İnternet kaynaklarıyla doğrulanmış yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'
           : info?.origin === 'demo'
             ? 'Simülasyon örneği · Gerçek bilgi değildir'
             : 'Yapay zekâ özeti · Klinik karar ve prospektüs yerine geçmez'}
       </p>
+      )}
     </Sheet>
   );
 }

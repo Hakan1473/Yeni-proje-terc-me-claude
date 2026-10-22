@@ -1,9 +1,9 @@
 import { type TermInfo, type TermQuery, termKey } from '../../shared/medical/terms';
 import * as api from './api';
 
-// v2: cards are web-checked; earlier ones (including simulation samples) are discarded
-const STORAGE = 'tr.terms.v2';
-const OLD_STORAGE = ['tr.terms'];
+// v3: one card type per anamnesis category; earlier cards (including stand-in ones) are discarded
+const STORAGE = 'tr.terms.v3';
+const OLD_STORAGE = ['tr.terms', 'tr.terms.v2'];
 const TTL = 30 * 24 * 3600 * 1000;
 const MAX = 300;
 
@@ -38,7 +38,7 @@ function persist(key: string, info: TermInfo) {
 export function cachedTerm(q: TermQuery): TermInfo | null {
   const hit = stored[termKey(q)];
   // A simulation sample is never a real answer
-  if (!hit || hit.info.origin === 'demo' || hit.info.summary?.startsWith('Simülasyon modunda')) return null;
+  if (!hit || (hit.info.origin !== 'web' && hit.info.origin !== 'ai')) return null;
   return Date.now() - hit.at < TTL ? hit.info : null;
 }
 
@@ -53,7 +53,8 @@ export function fetchTerm(q: TermQuery): Promise<TermInfo> {
       .term(q)
       .then((info) => {
         // Simulation samples are never kept: the real answer must replace them once a key is set
-        if (info.known && info.origin !== 'demo') persist(key, info);
+        // Only full answers are kept: simulation samples and stand-in reference cards are replaced next time
+        if (info.known && (info.origin === 'web' || info.origin === 'ai')) persist(key, info);
         return info;
       })
       .finally(() => pending.delete(key));
@@ -73,14 +74,12 @@ export function prefetchTerms(list: TermQuery[]) {
   }
   if (draining) return;
   draining = true;
-  // Two lookups at a time: web search takes a few seconds per term
-  const worker = async () => {
+  // One lookup at a time, so background cards never compete with the interpreter for the AI quota
+  void (async () => {
     while (queue.length) {
       const q = queue.shift() as TermQuery;
       await fetchTerm(q).catch(() => {});
     }
-  };
-  void Promise.all([worker(), worker()]).then(() => {
     draining = false;
-  });
+  })();
 }

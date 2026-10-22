@@ -29,7 +29,7 @@ export const config = {
   models: {
     live: process.env.LIVE_MODEL || 'gemini-3.8-live',
     fast: process.env.FAST_MODEL || 'gemini-3.1-flash-lite',
-    smart: process.env.SMART_MODEL || 'gemini-3.1-flash-lite',
+    smart: process.env.SMART_MODEL || 'gemini-3.8-flash',
     tts: process.env.TTS_MODEL || 'gemini-3.8-flash-lite-tts',
     ttsFallback: process.env.TTS_FALLBACK_MODEL || 'gemini-3.8-flash-tts',
   },

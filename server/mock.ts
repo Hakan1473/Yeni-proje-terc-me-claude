@@ -1,7 +1,7 @@
-import type { TermInfo, TermKind } from '../shared/medical/terms';
+import { cardTypeOf, type TermInfo, type TermKind } from '../shared/medical/terms';
 import { classifySpeaker } from '../shared/speaker';
 import { fold } from '../shared/text';
-import type { Language, Speaker } from '../shared/types';
+import type { FactCategory, Language, Speaker } from '../shared/types';
 import { pcmToWav } from './ai';
 
 /**
@@ -115,8 +115,20 @@ const MOCK_TERMS: (Omit<TermInfo, 'term' | 'kind' | 'known'> & { match: string }
   },
 ];
 
-export function mockTerm(term: string, kind: TermKind): TermInfo {
+const MOCK_PENICILLIN_ALLERGY: Omit<TermInfo, 'term' | 'kind' | 'known'> = {
+  summary: 'Penisilin grubu beta-laktam antibiyotiklere alerji. Aynı halka yapısını taşıyan diğer antibiyotiklerle çapraz reaksiyon görülebilir.',
+  drugClass: 'Beta-laktam antibiyotikler',
+  crossReactions: ['Amoksisilin (Augmentin, Largopen) — yüksek risk', 'Ampisilin (Alfasilin) — yüksek risk', 'Sefalosporinler (Sefazolin, Seftriakson) — düşük-orta risk'],
+  avoidList: ['Penisilin içeren kombinasyon preparatları'],
+  reactionSigns: ['Kurdeşen, kaşıntı', 'Dudak ve dilde şişlik', 'Hırıltı, nefes darlığı', 'Tansiyon düşmesi (anafilaksi)'],
+  nursing: ['Alerji bilekliği takılmalı', 'Antibiyotik orderları hekimle kontrol edilmeli', 'Acil set hazır olmalı'],
+};
+
+export function mockTerm(term: string, kind: TermKind, category?: FactCategory): TermInfo {
   const f = fold(term);
+  if (cardTypeOf({ kind, category }) === 'allergy' && f.includes('penisilin')) {
+    return { term, kind, category, known: true, origin: 'demo', ...MOCK_PENICILLIN_ALLERGY };
+  }
   const hit = MOCK_TERMS.find((t) => f.includes(t.match));
   if (hit) {
     const { match: _match, ...card } = hit;

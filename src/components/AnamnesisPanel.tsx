@@ -304,7 +304,8 @@ export function AnamnesisPanel() {
     [facts],
   );
   useEffect(() => {
-    prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => q !== null));
+    // Allergy and drug cards are opened most; the rest load on tap, which keeps the AI quota for the anamnesis
+    prefetchTerms(Array.from(terms.values()).filter((q): q is TermQuery => q !== null && (q.category === 'allergy' || q.category === 'medication')));
   }, [terms]);
 
   const copy = async () => {
