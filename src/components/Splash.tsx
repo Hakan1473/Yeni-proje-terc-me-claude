@@ -194,27 +194,31 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the timeline runs once
   useEffect(() => {
-    const timers: number[] = [];
-    const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    // The timeline runs on a frame clock that only counts smooth frames: when the
+    // phone is busy loading (a cold home-screen launch), the scene pauses instead of
+    // firing every step at once and skipping the greetings.
+    const queue: { t: number; fn: () => void }[] = [];
+    let clock = 0;
+    let last = 0;
+    let raf = 0;
     let cancelled = false;
-    let begun = false;
-    // A home-screen app keeps its launch image up until the page has loaded; a timeline
-    // started earlier would play unseen. Start once the page is loaded and painted.
-    const begin = () => {
-      if (begun || cancelled) return;
-      begun = true;
-      requestAnimationFrame(() => requestAnimationFrame(() => !cancelled && run()));
+    const at = (ms: number, fn: () => void) => queue.push({ t: clock + ms, fn });
+    const tick = (now: number) => {
+      if (cancelled) return;
+      if (last) clock += Math.min(now - last, 34);
+      last = now;
+      queue.sort((a, b) => a.t - b.t);
+      while (queue.length && queue[0].t <= clock) queue.shift()?.fn();
+      raf = requestAnimationFrame(tick);
     };
-    if (document.readyState === 'complete') begin();
-    else {
-      window.addEventListener('load', begin, { once: true });
-      // Never hold the app back on a slow resource
-      at(2500, begin);
-    }
+    raf = requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cancelled) return;
+      run();
+      raf = requestAnimationFrame(tick);
+    }));
     return () => {
       cancelled = true;
-      window.removeEventListener('load', begin);
-      for (const t of timers) clearTimeout(t);
+      cancelAnimationFrame(raf);
     };
 
     function run() {
