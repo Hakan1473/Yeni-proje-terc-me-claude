@@ -1,7 +1,7 @@
 import { Play, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-export const INTRO_VIDEO = { mp4: '/videos/intro.mp4', webm: '/videos/intro.webm', poster: '/videos/intro-poster.jpg', length: '1:42' };
+export const INTRO_VIDEO = { mp4: '/videos/intro.mp4?v=3', webm: '/videos/intro.webm?v=3', poster: '/videos/intro-poster.jpg?v=3', length: '5:22' };
 
 /**
  * The product introduction, shown once on first launch (and again on request

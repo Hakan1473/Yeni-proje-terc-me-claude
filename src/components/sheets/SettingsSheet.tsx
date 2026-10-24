@@ -8,6 +8,7 @@ import { useStore } from '../../lib/store';
 import { VideoSources } from '../Conversation';
 import { engine } from '../../live/engine';
 import { SectionFooter, SectionHeader, Segmented, Sheet } from '../ui';
+import { INTRO_VIDEO } from '../IntroVideo';
 
 const VOICES: { id: VoiceName; female: boolean; tone: string; about: string }[] = [
   { id: 'Zephyr', female: true, tone: 'Açık, şefkatli, akıcı', about: 'Sıcak ve sakinleştirici; hasta başında varsayılan.' },
@@ -309,7 +310,7 @@ export function SettingsSheet({
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="block text-[16px]">Tanıtım Videosu</span>
-                  <span className="block text-[13px] text-label-2 truncate">Uygulamanın 1:42 dakikalık sesli tanıtımı</span>
+                  <span className="block text-[13px] text-label-2 truncate">Uygulamanın {INTRO_VIDEO.length} dakikalık sesli tanıtımı</span>
                 </span>
                 <ChevronRight className="w-4 h-4 text-label-3" strokeWidth={2.5} />
               </button>
