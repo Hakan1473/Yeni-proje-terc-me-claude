@@ -254,7 +254,57 @@ const QUIT = /(?<!\p{L})bırak(?:tım|mıştım|alı|tı)\p{L}*/u;
 // ───────────────────────────── details ─────────────────────────────
 
 const NUM_WORD = '(?:\\d+|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|yirmi|otuz|yarım)';
-const DOSE = /(\d+(?:[.,]\d+)?)\s?(mg|mcg|µg|gr|g|ml|ünite|iu)(?![\p{L}])/iu;
+const TR_NUMBER_WORD = '(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|yirmi|otuz|kırk|elli|altmış|yetmiş|seksen|doksan|yüz|bin)';
+// Spoken doses come through the interpreter as words too: "elli miligram Beloc"
+const DOSE = new RegExp(
+  `(\\d+(?:[.,]\\d+)?|${TR_NUMBER_WORD}(?:\\s+${TR_NUMBER_WORD})*)\\s?(mg|mcg|µg|gr|g|ml|ünite|iu|miligram|mikrogram|gram|mililitre)(?![\\p{L}])`,
+  'iu',
+);
+const DOSE_UNITS: Record<string, string> = { miligram: 'mg', mikrogram: 'mcg', gram: 'g', mililitre: 'ml' };
+const TR_NUMBER_VALUES: Record<string, number> = {
+  bir: 1, iki: 2, üç: 3, dört: 4, beş: 5, altı: 6, yedi: 7, sekiz: 8, dokuz: 9,
+  on: 10, yirmi: 20, otuz: 30, kırk: 40, elli: 50, altmış: 60, yetmiş: 70, seksen: 80, doksan: 90,
+};
+
+/** "50 mg", or "iki yüz elli miligram" → "250 mg". */
+function formatDose(m: RegExpMatchArray): string {
+  const unit = lowerTr(m[2]);
+  let amount = m[1];
+  if (!/\d/.test(amount)) {
+    let total = 0;
+    let current = 0;
+    for (const w of lowerTr(amount).split(/\s+/)) {
+      if (w === 'yüz') current = (current || 1) * 100;
+      else if (w === 'bin') { total += (current || 1) * 1000; current = 0; }
+      else current += TR_NUMBER_VALUES[w] ?? 0;
+    }
+    amount = String(total + current);
+  }
+  return `${amount} ${DOSE_UNITS[unit] ?? unit}`;
+}
+
+/**
+ * The stretch of a clause that belongs to one drug. Turkish often puts the dose and
+ * frequency before the name ("günde iki kez Eliquis"), English after it, so when a
+ * clause names several drugs it is split at the list joints between them.
+ */
+function drugSpan(c: string, hits: { start: number; end: number }[], i: number): { start: number; end: number } {
+  const prevEnd = i > 0 ? hits[i - 1].end : 0;
+  const nextStart = hits[i + 1]?.start ?? c.length;
+  const joint = /\s*(?:,|;|\bve\b|\bile\b|\bayrıca\b|\bbir de\b|\band\b|\balso\b)\s*/giu;
+  const lastJoint = (from: number, to: number) => {
+    let at = -1;
+    for (const m of c.slice(from, to).matchAll(joint)) at = from + (m.index ?? 0) + m[0].length;
+    return at;
+  };
+  const firstJoint = (from: number, to: number) => {
+    const m = c.slice(from, to).match(new RegExp(joint.source, 'iu'));
+    return m?.index === undefined ? -1 : from + m.index;
+  };
+  const before = i > 0 ? lastJoint(prevEnd, hits[i].start) : 0;
+  const after = i < hits.length - 1 ? firstJoint(hits[i].end, nextStart) : -1;
+  return { start: before >= 0 ? before : hits[i].start, end: after >= 0 ? after : Math.min(nextStart, hits[i].end + 60) };
+}
 const FREQUENCY = new RegExp(
   `(?:günde\\s+${NUM_WORD}\\s*(?:kez|kere|defa|tane|tablet)?|${NUM_WORD}\\s*[x×]\\s*${NUM_WORD}|sabah(?:ları)?\\s+akşam(?:ları)?|sabahları|akşamları|gece yatarken|aç karnına|tok karnına|haftada\\s+${NUM_WORD}\\s*(?:kez|kere|gün)?|ihtiyaç (?:halinde|olunca)|ağrı olunca|lüzum halinde)`,
   'iu',
@@ -277,7 +327,7 @@ function parseSmallNumber(raw?: string): number | undefined {
 
 const ALLERGY_CUE = /(?<!\p{L})(?:alerj\p{L}*|dokun(?:uyor|du|ur)\p{L}*|reaksiyon\p{L}*|aşırı duyarlı\p{L}*)/u;
 const SMOKING = /(?<!\p{L})(?:sigara\p{L}*|tütün\p{L}*|puro\p{L}*|nargile\p{L}*|elektronik sigara)/u;
-const ALCOHOL = /(?<!\p{L})(?:alkol\p{L}*|içki\p{L}*|rakı\p{L}*|bira\p{L}*|şarap\p{L}*|votka\p{L}*|viski\p{L}*)/u;
+const ALCOHOL = /(?<!\p{L})(?:alkol\p{L}*|içki\p{L}*|rakı\p{L}*|bira(?!z|der)\p{L}*|şarap\p{L}*|votka\p{L}*|viski\p{L}*)/u;
 const SUBSTANCE = /(?<!\p{L})(?:uyuşturucu\p{L}*|esrar\p{L}*|madde kullan\p{L}*)/u;
 const SMOKE_AMOUNT = new RegExp(`(?:günde\\s+)?(${NUM_WORD})\\s+(paket|tane|adet|dal)`, 'iu');
 const SINCE_YEARS = new RegExp(`(${NUM_WORD})\\s+(?:yıl|sene)(?:dır|dir|dan beri|den beri)`, 'iu');
@@ -437,12 +487,15 @@ export function extractFacts(u: Utterance, state: DialogueState): Fact[] {
       }
     } else if (history) {
       drugHits.forEach((h, i) => {
-        // Dose and frequency belong to the drug they follow, up to the next drug
-        const tail = c.slice(h.end, Math.min(drugHits[i + 1]?.start ?? c.length, h.end + 60));
-        const dose = tail.match(DOSE);
-        const freq = tail.match(FREQUENCY);
+        // Dose and frequency belong to the drug they follow; failing that, to the
+        // drug they lead up to within the same list item
+        const span = drugSpan(c, drugHits, i);
+        const tail = c.slice(h.end, span.end);
+        const lead = c.slice(span.start, h.start);
+        const dose = tail.match(DOSE) ?? lead.match(DOSE);
+        const freq = tail.match(FREQUENCY) ?? lead.match(FREQUENCY);
         const label = drugLabel(h.entry, h.alias);
-        const detail = [dose ? `${dose[1]} ${dose[2].toLowerCase()}` : '', freq ? lowerTr(freq[0]) : ''].filter(Boolean);
+        const detail = [dose ? formatDose(dose) : '', freq ? lowerTr(freq[0]) : ''].filter(Boolean);
         const negated = isNegated(c, h);
         if (!isPatient && negated) return;
         add({

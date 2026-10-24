@@ -59,7 +59,9 @@ function useVoiceStreams(canvas: React.RefObject<HTMLCanvasElement | null>, leve
     let t = 0;
     let energy = 0;
     const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      // The first frame's timestamp can precede the setup time; a negative step would
+      // push a mote below zero and turn its envelope into NaN, stopping the loop
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
       last = now;
       energy += (level.current - energy) * (level.current > energy ? 0.35 : 0.06);
       t += dt * (1 + energy * 2.2);
@@ -102,7 +104,7 @@ function useVoiceStreams(canvas: React.RefObject<HTMLCanvasElement | null>, leve
         if (m.u > 1) m.u -= 1;
         const x = m.side < 0 ? m.u * (cx - gap) : w - m.u * (w - cx - gap);
         const u = m.side < 0 ? x / (cx - gap) : (w - x) / (w - cx - gap);
-        const env = Math.sin(Math.PI * Math.min(1, u)) ** 1.4;
+        const env = Math.max(0, Math.sin(Math.PI * Math.min(1, u))) ** 1.4;
         const y = cy + (7 + energy * 46) * env * Math.sin(x * 0.021 + t * 3.2 * m.side * -1);
         const a = Math.sin(Math.PI * m.u) * 0.9;
         const g = ctx.createRadialGradient(x, y, 0, x, y, m.size * 5);
@@ -194,9 +196,10 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the timeline runs once
   useEffect(() => {
-    // The timeline runs on a frame clock that only counts smooth frames: when the
-    // phone is busy loading (a cold home-screen launch), the scene pauses instead of
-    // firing every step at once and skipping the greetings.
+    // The timeline runs on a frame clock that skips stalls: when the phone is busy
+    // loading (a cold home-screen launch), the scene pauses instead of firing every
+    // step at once and skipping the greetings. A slow but steady frame rate still
+    // counts in full, and the app is never held back for long.
     const queue: { t: number; fn: () => void }[] = [];
     let clock = 0;
     let last = 0;
@@ -205,7 +208,8 @@ export function Splash({ onDone }: { onDone: () => void }) {
     const at = (ms: number, fn: () => void) => queue.push({ t: clock + ms, fn });
     const tick = (now: number) => {
       if (cancelled) return;
-      if (last) clock += Math.min(now - last, 34);
+      const gap = now - last;
+      if (last) clock += gap > 250 ? 16 : gap;
       last = now;
       queue.sort((a, b) => a.t - b.t);
       while (queue.length && queue[0].t <= clock) queue.shift()?.fn();
@@ -216,9 +220,11 @@ export function Splash({ onDone }: { onDone: () => void }) {
       run();
       raf = requestAnimationFrame(tick);
     }));
+    const deadline = window.setTimeout(() => !cancelled && exit(), T_EXIT + 5000);
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      clearTimeout(deadline);
     };
 
     function run() {

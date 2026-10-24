@@ -41,6 +41,17 @@ describe('extractFacts', () => {
     expect(view(dialogue([['patient', 'Göğüs ağrım var ve bulantı oldu.']]))).toEqual(['complaint: Göğüs ağrısı', 'complaint: Bulantı']);
   });
 
+  it('gives a dose or frequency said before the name to that drug, not the previous one', () => {
+    const facts = view(dialogue([['patient', 'Sabahları tansiyonum için elli miligram Beloc alıyorum ve günde iki kez Eliquis kullanıyorum.']]));
+    expect(facts).toEqual(['medication: Beloc (metoprolol) 50 mg · sabahları', 'medication: Eliquis (apiksaban) günde iki kez']);
+  });
+
+  it('does not read "biraz" as beer', () => {
+    const facts = view(dialogue([['patient', 'Dün geceden beri göğsümde baskı var ve biraz başım dönüyor.']]));
+    expect(facts.some((f) => f.startsWith('habit'))).toBe(false);
+    expect(view(dialogue([['patient', 'Akşamları bira içiyorum.']]))).toContain('habit: Alkol kullanıyor');
+  });
+
   it('scopes negation to its clause and keeps persistence verbs positive', () => {
     expect(view(dialogue([['patient', 'Üç gündür başım ağrıyor. Ateşim yok. Ağrım geçmiyor.']]))).toEqual([
       'complaint: Baş ağrısı (üç gündür)',
